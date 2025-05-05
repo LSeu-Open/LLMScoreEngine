@@ -1,0 +1,20 @@
+[project]
+name = "model-scoring-system"
+version = "1.0.0"
+description = "A comprehensive system for evaluating and scoring large language models based on multiple criteria."
+dependencies = [
+    "typing_extensions>=4.0.0",
+    "argparse>=1.4.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0"
+] 

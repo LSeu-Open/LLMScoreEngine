@@ -1,0 +1,6 @@
+typing_extensions>=4.0.0
+pytest>=7.0.0  # for running tests
+pytest-cov>=4.0.0  # for test coverage
+black>=23.0.0  # for code formatting
+flake8>=6.0.0  # for linting
+argparse>=1.4.0  # for CLI support 
