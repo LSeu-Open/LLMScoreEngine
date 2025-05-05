@@ -36,12 +36,8 @@ LLMScoreEngine/
 │   ├── test_model_scorer.py
 │   ├── test_scoring.py
 │   └── test_validators.py
-├── .gitattributes             # Git attributes file
-├── .gitignore                 # Git ignore file
-├── .vscode/                   # VSCode settings (optional)
 ├── LICENSE                    # Project license file
 ├── README.md                  # This file
-├── TODO.txt                   # To-do list for development
 ├── pyproject.toml             # Project configuration (for build system, linters, etc.)
 ├── requirements.txt           # Project dependencies
 └── score_models.py            # Main command-line scoring script
