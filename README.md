@@ -2,8 +2,12 @@
 
 A comprehensive system for evaluating and scoring large language models based on multiple criteria.
 
-## Overview
+## Introduction
 
+This evaluation system provides an objective way to assess Large Language Models (LLMs) using standardized metrics. 
+
+Originally developed within the [AIenhancedWork](https://github.com/LSeu-Open/AIEnhancedWork) repository to evaluate models in the LLMs section, it has now been migrated to this dedicated project for improved organization, scalability, and focus.
+ 
 This project provides tools for scoring and comparing large language models based on the following criteria:
 
 - **Entity benchmarks** (25 points max)
@@ -11,7 +15,7 @@ This project provides tools for scoring and comparing large language models base
 - **Community score** (20 points max)
 - **Technical specifications** (20 points max)
 
-The final score is calculated out of 100 points (if you want to have a detailed breakdown of the scoring framework, please refer to the `scoring_framework_development_notes.md` file).
+The final score is calculated out of 100 points (if you want to have a detailed breakdown of the scoring framework, please refer to the [scoring_framework_development_notes.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/dev_ideas/scoring_framework_development_notes.md) file).
 
 Please note that this is a beta version and the scoring system is subject to change.
 
@@ -274,6 +278,5 @@ Results will be stored as JSON files in the `Results` directory, with the follow
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/LSeu-Open/LLMScoreEngine/blob/main/LICENSE) file for details.
 
-## Contributors
-
-- LSeu-Open
+<br>
+<br>
