@@ -1,6 +1,21 @@
-# LLMScoreEngine
+<div align="center"> 
 
-A comprehensive system for evaluating and scoring large language models based on multiple criteria.
+<img src="https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Images/LLMScoreEngine.png">
+
+<br>
+<br>
+
+***A comprehensive system for evaluating and scoring large language models based on multiple criteria.***
+
+<br>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://github.com/LSeu-Open/LLMScoreEngine/blob/main/LICENSE)
+![LastCommit](https://img.shields.io/github/last-commit/LSeu-Open/LLMScoreEngine?style=flat)
+![LastRelease](https://img.shields.io/github/v/release/LSeu-Open/LLMScoreEngine?style=flat)
+
+</div>
+
+<br>
 
 ## Introduction
 
