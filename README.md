@@ -30,7 +30,7 @@ This project provides tools for scoring and comparing large language models base
 - **Community score** (20 points max)
 - **Technical specifications** (20 points max)
 
-The final score is calculated out of 100 points (if you want to have a detailed breakdown of the scoring framework, please refer to the [scoring_framework_development_notes.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/dev_ideas/scoring_framework_development_notes.md) file).
+The final score is calculated out of 100 points (if you want to have a detailed breakdown of the scoring framework, please refer to the [scoring_framework.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/scoring_framework.md) file).
 
 Please note that this is a beta version and the scoring system is subject to change.
 
