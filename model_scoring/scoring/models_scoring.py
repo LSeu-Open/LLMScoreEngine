@@ -23,6 +23,11 @@
 # ModelScorer class
 # ------------------------------------------------------------------------------------------------
 
+import math
+from typing import Optional
+
+from ..core.constants import LM_SYS_ARENA_SCORE_BOUNDS
+
 class ModelScorer:
     """
     A class for scoring and evaluating large language models based on multiple criteria.
@@ -51,9 +56,9 @@ class ModelScorer:
         """
         self.model_name = model_name
         
-    def calculate_entity_benchmarks(self, benchmark_scores):
+    def calculate_entity_benchmarks(self, benchmark_scores: dict) -> float:
         """
-        Calculate entity benchmarks score out of 25 points maximum.
+        Calculate entity benchmarks score out of 30 points maximum.
         
         Evaluates performance on core entity benchmarks like artificial analysis,
         live code bench, big code models and open LLM evaluations.
@@ -62,102 +67,138 @@ class ModelScorer:
             benchmark_scores (dict): Dictionary mapping benchmark names to scores (0-1 range)
             
         Returns:
-            float: Weighted score out of 25 points
+            float: Weighted score out of 30 points
         """
         if not benchmark_scores:
-            return 0
+            return 0.0
             
         # Define relative weights for each benchmark
         weights = {
-            'artificial_analysis': 25,
-            'live_code_bench': 25, 
-            'big_code_models': 25,
-            'open_llm': 25,
+            'artificial_analysis': 10, 
+            'OpenCompass': 10,         
+            'LLM Explorer': 10,        
+            'Livebench': 10,           
+            'open_llm': 10,            
+            'UGI Leaderboard': 10,     
+            'big_code_bench': 10,      
+            'EvalPlus Leaderboard': 10,
+            'Dubesord_LLM': 10,        
+            'Open VLM': 10,            
         }
         
-        score = 0
-        available_weights = 0
+        score = 0.0
+        total_weight_for_scored_benchmarks = 0.0
         
         # Calculate weighted average of available scores
-        for bench, result in benchmark_scores.items():
-            if result is not None:
-                score += (result * weights[bench])
-                available_weights += weights[bench]
+        for bench_key, result in benchmark_scores.items():
+            if bench_key in weights and result is not None:
+                # Assuming result is already 0-1 (as per docstring and previous validation steps)
+                # and weights are relative importance (all 10 here means equal)
+                score += (result * weights[bench_key])
+                total_weight_for_scored_benchmarks += weights[bench_key]
+            elif bench_key not in weights and result is not None:
+                # Optionally, log a warning for unexpected benchmark keys if they have scores
+                # logger.warning(f"Benchmark key '{bench_key}' not found in defined weights for entity benchmarks.")
+                pass 
                 
-        # Scale to 25 points maximum if we have scores
-        if available_weights > 0:
-            return (score / available_weights) * 25
-        return 0
+        # Scale to 30 points maximum if we have scores
+        if total_weight_for_scored_benchmarks > 0:
+            # The average score of the available benchmarks (0-10 scale if weights are 10)
+            average_performance = score / total_weight_for_scored_benchmarks # This is average on a 0-1 scale because result is 0-1 and weights[bench_key] are effectively cancelled out by same sum in denominator.
+            return average_performance * 30.0
+        return 0.0
 
-    def calculate_dev_benchmarks(self, benchmark_scores):
+    def calculate_dev_benchmarks(self, benchmark_scores: dict) -> float:
         """
-        Calculate dev benchmarks score out of 35 points maximum.
+        Calculate dev benchmarks score out of 30 points maximum.
         
-        Evaluates performance across a wide range of development benchmarks including:
-        - Language understanding (MMLU, BigBench)
-        - Reasoning (DROP, HellaSwag)
-        - Math & coding (MATH, HumanEval)
-        - And many others
+        Evaluates performance across a wide range of development benchmarks as defined in Exploration.md.
+        Weights are based on Exploration.md.
         
         Args:
-            benchmark_scores (dict): Dictionary mapping benchmark names to scores (0-1 range)
+            benchmark_scores (dict): Dictionary mapping benchmark names to scores (0-1 range).
+                                     Keys should match those defined in the weights dictionary.
             
         Returns:
-            float: Weighted score out of 35 points
+            float: Weighted score out of 30 points.
         """
         if not benchmark_scores:
-            return 0
+            return 0.0
             
-        # Define relative weights for each benchmark based on importance
+        # Define relative weights for each benchmark based on Exploration.md
+        # Total weight sum from Exploration.md is 80 for the Dev Benchs section.
         weights = {
-            'MMLU': 3.0,
-            'MMLU Pro': 8.0,
-            'BigBench': 3.0,
-            'DROP': 7.0,
-            'HellaSwag': 7.0,
-            'GPQA': 2.0,
-            'ARC-C': 2.0,
-            'LiveBench': 1.5,
-            'LatestEval': 1.5,
-            'AlignBench': 4.0,
-            'Wild Bench': 4.0,
-            'MT-bench': 4.0,
-            'IFEval': 4.0,
-            'Arena-Hard': 4.5,
-            'TruthfulQA': 4.5,
-            'MATH': 4.0,
-            'GSM-8K': 4.0,
-            'MGSM': 7.0,
-            'HumanEval': 3.0,
-            'HumanEval Plus': 3.0,
-            'MBPP': 3.0,
-            'MBPP Plus': 3.0,
-            'SWE-bench': 2.0,
-            'API-Bank': 2.0,
-            'BFCL': 5.0,
-            'Gorilla Benchmark': 2.0,
-            'Nexus': 2.0
+            # General knowledge and reasoning (Total Weight: 28)
+            'MMLU': 3,
+            'MMLU Pro': 5,
+            'BigBenchHard': 3,
+            'GPQA diamond': 7,
+            'DROP': 3,
+            "Humanity's Last Exam": 4,
+            'HellaSwag': 3,
+            'ARC-C': 3,
+            # Instruction following (Total Weight: 12)
+            'Wild bench': 3,
+            'MT bench': 3,
+            'IFEval': 3,
+            'Arena Hard': 3,
+            # Math (Total Weight: 10)
+            'Math': 3,
+            'GSM8K': 3,
+            'AIME': 4,
+            # Coding (Total Weight: 13)
+            'HumanEval': 1,
+            'MBPP': 1,
+            'LiveCodeBench': 4,
+            'Aider Polyglot': 2,
+            'SWE-Bench': 2,
+            'SciCode': 3,
+            # Multilingual (Total Weight: 8)
+            'MGSM': 2,
+            'MMMLU': 2,
+            'C-Eval or CMMLU': 2,
+            'AraMMLu': 2,
+            # Context (Total Weight: 8)
+            'LongBench': 2,
+            'RULER 128K': 2,
+            'RULER 32K': 2,
+            'MTOB': 2,
+            # Function calling (tool use and agent) (Total Weight: 10)
+            'BFCL': 3,
+            'AgentBench': 2,
+            'Gorilla': 1,
+            'ToolBench': 2,
+            'MINT': 2,
+            # Vision (Total Weight: 8)
+            'MMMU': 2,
+            'Mathvista': 3,
+            'ChartQA': 1,
+            'DocVQA': 1,
+            'AI2D': 1,
         }
         
-        score = 0
-        available_weights = 0
+        current_score = 0.0
+        total_weight_of_scored_benchmarks = 0.0
         
-        # Calculate weighted average of available scores
-        for bench, result in benchmark_scores.items():
-            if result is not None and bench in weights:
-                score += (result * weights[bench])
-                available_weights += weights[bench]
-                
-        # Scale to 35 points maximum if we have scores
-        if available_weights > 0:
-            return (score / available_weights) * 35
-        return 0
+        # Calculate weighted sum of available scores
+        for bench_key, result in benchmark_scores.items():
+            if bench_key in weights and result is not None:
+                current_score += (result * weights[bench_key])
+                total_weight_of_scored_benchmarks += weights[bench_key]
+            elif bench_key not in weights and result is not None:
+                # logger.warning(f"Benchmark key '{bench_key}' not found in defined weights for dev benchmarks.")
+                pass 
+
+        if total_weight_of_scored_benchmarks > 0:
+            average_performance = current_score / total_weight_of_scored_benchmarks
+            return average_performance * 30.0
+        return 0.0
 
     def calculate_external_benchmarks(self, entity_benchmarks, dev_benchmarks=None):
         """
         Calculate total external benchmarks score out of 60 points maximum.
         
-        Combines entity benchmarks (25 points) and dev benchmarks (35 points).
+        Combines entity benchmarks (30 points) and dev benchmarks (30 points).
         
         Args:
             entity_benchmarks (dict): Entity benchmark scores
@@ -172,147 +213,221 @@ class ModelScorer:
         entity_score = self.calculate_entity_benchmarks(entity_benchmarks)
         dev_score = self.calculate_dev_benchmarks(dev_benchmarks)
         return entity_score + dev_score
-
-    def calculate_community_score(self, elo_rating):
+ 
+    def calculate_community_score(self, lm_sys_arena_elo_rating: Optional[float], hf_score: Optional[float]) -> Optional[float]:
         """
-        Calculate community engagement score out of 20 points maximum.
-        
-        Converts ELO rating to a normalized score between 0-20 points.
+        Calculate the total community score out of 20 points maximum.
+
+        The calculation depends on which scores are provided:
+        - If only `lm_sys_arena_elo_rating` is provided: It's normalized to a 0-20 scale.
+        - If only `hf_score` is provided: It's scaled to contribute 0-20 points (assuming input `hf_score` is 0-10).
+        - If both are provided: `lm_sys_arena_elo_rating` is normalized to a 0-10 scale,
+          and `hf_score` (expected 0-10 points) is added to it.
+        The maximum possible score is 20.
         
         Args:
-            elo_rating (float): Model's ELO rating from community evaluations
+            lm_sys_arena_elo_rating (Optional[float]): Model's LMsys Arena ELO rating.
+            hf_score (Optional[float]): Model's Hugging Face community score (expected 0-10 points).
             
         Returns:
-            float: Community score out of 20 points, or None if no rating provided
+            Optional[float]: Total community score. 
+                             Returns None if both input scores are None.
         """
-        if elo_rating is None:
+        if lm_sys_arena_elo_rating is None and hf_score is None:
             return None
             
-        base_elo = 1000  # Minimum expected ELO
-        max_elo = 1402   # Maximum expected ELO
+        total_score = 0.0
         
-        # Normalize to percentage then scale to 20 points
-        normalized_score = ((elo_rating - base_elo) / (max_elo - base_elo)) * 100
-        return (normalized_score * 0.2)  # 20 points max
+        if lm_sys_arena_elo_rating is not None:
+            min_elo = LM_SYS_ARENA_SCORE_BOUNDS["MIN"]
+            max_elo = LM_SYS_ARENA_SCORE_BOUNDS["MAX"]
+            
+            # Determine the scale for ELO normalization based on hf_score's presence
+            elo_normalization_scale = 20.0 if hf_score is None else 10.0
+            
+            if max_elo == min_elo: # Avoid division by zero if bounds are misconfigured
+                normalized_elo_score = 0.0 if lm_sys_arena_elo_rating <= min_elo else elo_normalization_scale
+            else:
+                normalized_elo_score = ((lm_sys_arena_elo_rating - min_elo) / (max_elo - min_elo)) * elo_normalization_scale
+            
+            # Clamp the score between 0 and the determined normalization scale
+            normalized_elo_score = max(0.0, min(elo_normalization_scale, normalized_elo_score))
+            total_score += normalized_elo_score
+        
+        if hf_score is not None:
+            if lm_sys_arena_elo_rating is None: # HF only case
+                # HF score (input assumed 0-10) contributes 0-20 points
+                # Scale hf_score by 2 and clamp to ensure it's within [0, 20]
+                hf_contribution = max(0.0, min(20.0, hf_score * 2.0))
+            else: # HF is present AND ELO is also present
+                # HF score (input assumed 0-10) contributes 0-10 points
+                # Assuming hf_score is already validated/clamped to be within 0-10
+                hf_contribution = hf_score 
+            total_score += hf_contribution
+            
+        return round(total_score, 2)
 
-    def _calculate_price_score(self, price):
+    def _calculate_price_score(self, price: float | None) -> float:
         """
         Calculate score based on model's price point (8 points max).
-        
+        Uses a linear scale as defined in Exploration.md.
+
         Args:
-            price (float): Price per million tokens in USD
-            
+            price (float | None): Price per million tokens in USD.
+
         Returns:
-            int: Score from 1-8 based on price brackets
+            float: Score from 0.0-8.0 based on price.
+                   Returns 0.0 if price is None.
         """
         if price is None:
-            return 0
-        if price < 1: return 8
-        elif price < 3: return 7
-        elif price < 5: return 6
-        elif price < 10: return 5
-        elif price < 20: return 4
-        elif price < 40: return 3
-        elif price < 80: return 2
-        else: return 1
+            return 0.0
 
-    def _calculate_context_score(self, context_size):
+        # Apply conditions from Exploration.md for max and min points
+        if price <= 0.0:
+            return 8.0
+        if price >= 20.0:
+            return 1.0
+
+        # Formula from Exploration.md: Points = 8.0 - (0.35 * Price)
+        # The bounds above (<=0 and >=20) effectively clamp the formula's natural output at its extremes.
+        # For prices between 0 and 20, the formula itself will produce values within the 1.0 to 8.0 range.
+        # e.g. price=0.01 -> 8.0 - 0.0035 = 7.9965
+        #      price=19.99 -> 8.0 - 6.9965 = 1.0035
+        
+        raw_calculated_score = 8.0 - (0.35 * price)
+
+        # Ensure the score is strictly within 1.0 and 8.0 after calculation, 
+        price_score = max(1.0, min(8.0, raw_calculated_score))
+
+        return price_score 
+
+    def _calculate_context_score(self, context_size: int | None) -> float:
         """
         Calculate score based on context window size (6 points max).
-        
+        Uses a logarithmic scale (base 2) as defined in Exploration.md.
+
         Args:
-            context_size (int): Maximum context window size in tokens
-            
+            context_size (int | None): Maximum context window size in tokens.
+
         Returns:
-            int: Score from 1-6 based on context size brackets
+            float: Score from 0.0-6.0 based on context size.
+                   Returns 0.0 if context_size is None.
         """
+        # This function uses math.log2, ensure 'import math' is at the top of the file.
         if context_size is None:
-            return 0
-        if context_size > 200000: return 6
-        elif context_size > 100000: return 5
-        elif context_size > 32000: return 4
-        elif context_size > 16000: return 3
-        elif context_size > 8000: return 2
-        else: return 1
-
-    def calculate_size_perf_ratio(self, benchmark_score, param_count):
-        """
-        Calculate performance-to-size efficiency ratio score (6 points max).
+            return 0.0
         
-        Evaluates how well the model performs relative to its parameter count.
-        Higher scores indicate better efficiency.
-        
-        Args:
-            benchmark_score (float): Average benchmark performance (0-100)
-            param_count (float): Number of parameters in billions
+        if context_size < 8192: # W < 8192, as per Exploration.md
+            return 1.0
+        else: # W >= 8192
+            # Formula from Exploration.md: Points ≈ 0.571 * log2(W) - 5.929
+            # Calculation: Points = max(1.0, min(6.0, 0.571 * log2(W) - 5.929))
             
-        Returns:
-            float: Efficiency score from 2-6 points
-        """
-        # Base score from performance - adjusted thresholds
-        if benchmark_score > 85:     
-            base_score = 6.0            # Excellent (>85%)
-        elif benchmark_score > 75:      # Changed >= to >
-            base_score = 5.0            # Good (76-85%)
-        elif benchmark_score > 65:      # Changed >= to >
-            base_score = 4.0            # Decent (66-75%)
-        elif benchmark_score > 55:      # Keep as >
-            base_score = 3.0            # Moderate (56-65%)
-        else:                           
-            base_score = 2.0            # Poor (≤55%)
-        
-        # Apply size efficiency multiplier
-        if param_count >= 70:           
-            return min(base_score, 3.0) 
-        elif param_count >= 40:         
-            return min(base_score, 4.0) 
-        elif param_count >= 30:         
-            return min(base_score, 5.0) 
-        elif param_count >= 15:         
-            return min(base_score, 5.5) 
-        else:                          
-            return min(base_score, 6.0)
-
-    def _calculate_ratio_score(self, ratio):
-        """
-        Calculate score based on size-performance ratio (6 points max).
-        
-        Args:
-            ratio (float): Size-performance ratio score
+            raw_score_from_formula = 0.571 * math.log2(context_size) - 5.929
             
-        Returns:
-            int: Score from 2-6 based on ratio brackets
-        """
-        if ratio is None:
-            return 0
-        if ratio > 90: return 6
-        elif ratio > 80: return 5
-        elif ratio > 70: return 4
-        elif ratio > 60: return 3
-        else: return 2
+            # Apply bounds as per the "Calculation" line in Exploration.md
+            context_score = max(1.0, min(6.0, raw_score_from_formula))
+            
+            return context_score
 
-    def calculate_technical_score(self, price, context_window, size_perf_ratio):
+    def calculate_size_perf_ratio(self, benchmark_score: float, param_count: int, architecture: str) -> float:
+        """
+        Calculate Model Size vs Performance Ratio score (6 points max) as defined in Exploration.md.
+
+        This component assesses a model's performance relative to its size and architectural efficiency.
+        Points are awarded based on a `Combined Score` using a linear scale.
+
+        Args:
+            benchmark_score (float): Average benchmark performance (0-100 scale).
+            param_count (int): Actual number of parameters (e.g., 7000000000 for 7B).
+            architecture (str): Architecture of the model (e.g., "moe", "ssm", "dense").
+
+        Returns:
+            float: Efficiency score from 1.0 to 6.0 points.
+        """
+        if benchmark_score is None or param_count is None or architecture is None:
+            return 0.0 # Or handle as an error/default appropriately
+
+        # 1. Determine Base Size Factor from Exploration.md
+        # - < 3B parameters: 1.00
+        # - 3B - 10B parameters: 0.95
+        # - 10B - 30B parameters: 0.90
+        # - 30B - 80B parameters: 0.80
+        # - 80B - 200B parameters: 0.70
+        # - > 200B parameters: 0.60
+        if param_count < 3_000_000_000:
+            base_size_factor = 1.00
+        elif param_count < 10_000_000_000:
+            base_size_factor = 0.95
+        elif param_count < 30_000_000_000:
+            base_size_factor = 0.90
+        elif param_count < 80_000_000_000:
+            base_size_factor = 0.80
+        elif param_count < 200_000_000_000:
+            base_size_factor = 0.70
+        else: # > 200B
+            base_size_factor = 0.60
+
+        # 2. Determine Architecture Factor from Exploration.md
+        # - Mixture of Experts (MoE) models: 1.2
+        # - State Space Models (SSM): 1.1
+        # - Dense Transformer models: 1.0
+        # - Other specialized efficient architectures: 1.1
+        arch_lower = architecture.lower()
+        if "moe" in arch_lower:
+            architecture_factor = 1.2
+        elif "ssm" in arch_lower: # Catching common SSM variants
+            architecture_factor = 1.1
+        elif arch_lower == "dense" or arch_lower == "dense_transformer":
+            architecture_factor = 1.0
+        elif "specialized" in arch_lower or "efficient" in arch_lower: # For "Other specialized efficient architectures"
+            architecture_factor = 1.1 
+        else: # Default to Dense Transformer if not recognized
+            architecture_factor = 1.0
+
+        # 3. Calculate Total Efficiency Factor
+        total_efficiency_factor = base_size_factor * architecture_factor
+
+        # 4. Calculate Combined Score
+        # benchmark_score is already 0-100, so divide by 100
+        combined_score = (benchmark_score / 100.0) * total_efficiency_factor
+
+        # 5. Calculate Final Points using the linear formula with bounds
+        # Points = max(1.0, min(6.0, 1.0 + 5.0 * Combined Score))
+        points = max(1.0, min(6.0, 1.0 + (5.0 * combined_score)))
+
+        return points
+
+    def calculate_technical_score(self, price: float | None, context_window: int | None, benchmark_score: float | None, param_count: int | None, architecture: str | None) -> float:
         """
         Calculate technical specifications score out of 20 points maximum.
         
         Combines scores for:
         - Price efficiency (8 points)
         - Context window size (6 points)
-        - Size-performance ratio (6 points)
+        - Model Size vs Performance Ratio (6 points)
         
         Args:
-            price (float): Price per million tokens in USD
-            context_window (int): Maximum context window size in tokens
-            size_perf_ratio (float): Performance to parameter count ratio
+            price (float | None): Price per million tokens in USD.
+            context_window (int | None): Maximum context window size in tokens.
+            benchmark_score (float | None): Average benchmark performance (0-100 scale) for ratio calculation.
+            param_count (int | None): Actual number of parameters for ratio calculation.
+            architecture (str | None): Architecture of the model for ratio calculation.
             
         Returns:
-            float: Combined technical score out of 20 points
+            float: Combined technical score out of 20 points.
         """
         price_score = self._calculate_price_score(price)
         context_score = self._calculate_context_score(context_window)
-        ratio_score = self._calculate_ratio_score(size_perf_ratio)
         
-        return price_score + context_score + ratio_score
+        # Directly call the updated calculate_size_perf_ratio method
+        # It requires benchmark_score, param_count, and architecture
+        if benchmark_score is not None and param_count is not None and architecture is not None:
+            ratio_points = self.calculate_size_perf_ratio(benchmark_score, param_count, architecture)
+        else:
+            ratio_points = 0.0 # Default if necessary info for ratio score is missing
+        
+        return price_score + context_score + ratio_points
 
     def calculate_final_score(self):
         """
