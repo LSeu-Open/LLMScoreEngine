@@ -13,10 +13,15 @@ SCORE_BOUNDS = {
     "MAX": 100
 }
 
-# Community score bounds (based on the community score of the best models 20 feb 2025)
-COMMUNITY_SCORE_BOUNDS = {
+# Bounds for individual components of the community score
+LM_SYS_ARENA_SCORE_BOUNDS = {
     "MIN": 1000,
     "MAX": 1500
+}
+
+HF_COMMUNITY_SCORE_BOUNDS = {
+    "MIN": 0,
+    "MAX": 10
 }
 
 # Directory and file constants
@@ -28,18 +33,57 @@ LOG_FILE = "model_scoring.log"
 REQUIRED_SECTIONS = {
     'entity_benchmarks': [
         'artificial_analysis',
-        'live_code_bench',
-        'big_code_models',
-        'open_llm'
+        'OpenCompass',
+        'LLM Explorer',
+        'Livebench',
+        'open_llm',
+        'UGI Leaderboard',
+        'big_code_bench',
+        'EvalPlus Leaderboard',
+        'Dubesord_LLM',
+        'Open VLM',
     ],
     'dev_benchmarks': [
-        'MMLU', 'MMLU Pro', 'BigBench', 'DROP', 'HellaSwag', 'GPQA', 
-        'ARC-C', 'LiveBench', 'LatestEval', 'AlignBench', 'Wild Bench',
-        'MT-bench', 'IFEval', 'Arena-Hard', 'TruthfulQA', 'MATH',
-        'GSM-8K', 'MGSM', 'HumanEval', 'HumanEval Plus', 'MBPP',
-        'MBPP Plus', 'SWE-bench', 'API-Bank', 'BFCL',
-        'Gorilla Benchmark', 'Nexus'
+        'MMLU', 
+        'MMLU Pro', 
+        'BigBenchHard',
+        'GPQA diamond', 
+        'DROP', 
+        'HellaSwag', 
+        'Humanity\'s Last Exam',
+        'ARC-C', 
+        'Wild Bench',
+        'MT-bench', 
+        'IFEval', 
+        'Arena-Hard',
+        'MATH',
+        'GSM-8K',
+        'AIME',
+        'HumanEval',
+        'MBPP',
+        'LiveCodeBench',
+        'Aider Polyglot',
+        'SWE-Bench',
+        'SciCode',
+        'MGSM',
+        'MMMLU',
+        'C-Eval or CMMLU',
+        'AraMMLu',
+        'LongBench',
+        'RULER 128K',
+        'RULER 32K',
+        'MTOB',
+        'BFCL',
+        'AgentBench',
+        'Gorilla Benchmark',
+        'ToolBench',
+        'MINT',
+        'MMMU',
+        'Mathvista',
+        'ChartQA',
+        'DocVQA',
+        'AI2D',
     ],
-    'model_specs': ['price', 'context_window', 'param_count'],
-    'community_score': None
+    'model_specs': ['price', 'context_window', 'param_count', 'architecture'],
+    'community_score': ['lm_sys_arena_score', 'hf_score']
 } 
