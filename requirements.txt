@@ -4,3 +4,4 @@ pytest-cov>=4.0.0  # for test coverage
 black>=23.0.0  # for code formatting
 flake8>=6.0.0  # for linting
 argparse>=1.4.0  # for CLI support 
+huggingface-hub>=0.20.0 # for Hugging Face model information 
