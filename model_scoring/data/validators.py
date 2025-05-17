@@ -21,7 +21,7 @@ the data conforms to the expected structure and constraints.
 from typing import Dict, Any, Optional
 import logging
 
-from ..core.constants import SCORE_BOUNDS, REQUIRED_SECTIONS, SCORE_SCALE, COMMUNITY_SCORE_BOUNDS
+from ..core.constants import SCORE_BOUNDS, REQUIRED_SECTIONS, SCORE_SCALE, LM_SYS_ARENA_SCORE_BOUNDS, HF_COMMUNITY_SCORE_BOUNDS
 from ..core.exceptions import BenchmarkScoreError, ModelSpecificationError, CommunityScoreError, ModelDataValidationError
 
 logger = logging.getLogger(__name__)
@@ -98,11 +98,12 @@ class ModelDataValidator:
         Raises:
             ModelSpecificationError: If any of these validation checks fail:
                 - Required specification field is missing
-                - Specification value is not a number (int/float)
-                - Specification value is not positive (>0)
+                - Specification value is not of the expected type (str for architecture, number for others)
+                - Numeric specification value is not positive (>0)
 
         Notes:
-            - All specification values must be positive numbers
+            - 'architecture' field must be a string.
+            - Other specification values must be positive numbers.
             - Common specs include parameters like model size, context length, etc.
             - The specific required fields are defined in REQUIRED_SECTIONS['model_specs']
         """
@@ -114,64 +115,91 @@ class ModelDataValidator:
                     f"Missing specification '{field}' in model_specs for '{model_name}'"
                 )
             
-            # Verify specification value is numeric
+            # Handle 'architecture' field specifically (must be string)
+            if field == 'architecture':
+                if not isinstance(specs[field], str):
+                    raise ModelSpecificationError(
+                        f"Invalid type for 'architecture' in model_specs for '{model_name}': expected str, got {type(specs[field]).__name__}"
+                    )
+                if not specs[field].strip(): # Ensure architecture string is not empty or just whitespace
+                     raise ModelSpecificationError(
+                        f"Specification 'architecture' cannot be empty in model_specs for '{model_name}'"
+                    )
+                continue # Skip numeric checks for architecture
+
+            # Verify other specification values are numeric
             if not isinstance(specs[field], (int, float)):
                 raise ModelSpecificationError(
-                    f"Invalid type for '{field}' in model_specs: expected number, got {type(specs[field]).__name__}"
+                    f"Invalid type for '{field}' in model_specs for '{model_name}': expected number, got {type(specs[field]).__name__}"
                 )
             
-            # Ensure specification value is positive
+            # Ensure numeric specification value is positive
             if specs[field] <= 0:
                 raise ModelSpecificationError(
-                    f"Specification '{field}' must be positive, got {specs[field]}"
+                    f"Specification '{field}' must be positive for '{model_name}', got {specs[field]}"
                 )
 
     @staticmethod
-    def validate_community_score(score: Any, model_name: str) -> None:
-        """Validate the community score for a language model.
+    def validate_community_score(scores_data: Dict[str, Any], model_name: str) -> None:
+        """Validate the community scores for a language model.
         
-        This method performs validation checks on a model's community score to ensure
-        it meets the required criteria for validity.
+        This method checks that the community_score section is a dictionary
+        and validates its constituent scores (e.g., lm_sys_arena_score, hf_score)
+        against their respective bounds (0-10 points each).
 
         Args:
-            score (Any): The community score value to validate. Must be a number.
+            scores_data (Dict[str, Any]): The dictionary containing community scores.
+                                          Expected to have keys as defined in REQUIRED_SECTIONS['community_score'].
             model_name (str): Name of the model being validated, used in error messages.
 
         Raises:
             CommunityScoreError: If any of these validation checks fail:
-                - Score is not a numeric type (int/float)
-                - Score is negative
-                - Score is below minimum threshold (COMMUNITY_SCORE_BOUNDS["MIN"])
-                - Score exceeds maximum threshold (COMMUNITY_SCORE_BOUNDS["MAX"])
+                - community_score section is not a dictionary.
+                - A required score field (e.g., 'lm_sys_arena_score', 'hf_score') is missing.
+                - A score value is not a numeric type (int/float) when not None.
+                - A score value is outside its defined bounds (e.g., 0-10).
 
         Notes:
-            - Community scores represent the model's rating/reputation in the community
-            - Valid scores must be positive numbers within defined bounds
-            - Bounds are defined in COMMUNITY_SCORE_BOUNDS constants
+            - Individual scores can be None, indicating the score is not yet available.
+            - Bounds for each score component are defined in constants.py (e.g., LM_SYS_ARENA_SCORE_BOUNDS).
         """
-        # Validate score is numeric type
-        if not isinstance(score, (int, float)):
+        if not isinstance(scores_data, dict):
             raise CommunityScoreError(
-                f"Invalid community score type for '{model_name}': expected number, got {type(score).__name__}"
+                f"Community score section must be a dictionary for model '{model_name}', got {type(scores_data).__name__}"
             )
 
-        # Ensure score is not negative
-        if score < 0:
-            raise CommunityScoreError(
-                f"Community score must be positive, got {score}"
-            )
+        for field in REQUIRED_SECTIONS['community_score']:
+            if field not in scores_data:
+                raise CommunityScoreError(
+                    f"Missing community score field '{field}' for model '{model_name}'"
+                )
+            
+            score_value = scores_data[field]
 
-        # Validate score meets minimum threshold
-        if score < COMMUNITY_SCORE_BOUNDS["MIN"]:
-            raise CommunityScoreError(
-                f"Community score must be at least {COMMUNITY_SCORE_BOUNDS['MIN']}, got {score}"
-            )
+            # Only validate non-null scores
+            if score_value is not None:
+                if not isinstance(score_value, (int, float)):
+                    raise CommunityScoreError(
+                        f"Invalid type for community score '{field}' for model '{model_name}': expected number, got {type(score_value).__name__}"
+                    )
 
-        # Validate score does not exceed maximum threshold  
-        if score > COMMUNITY_SCORE_BOUNDS["MAX"]:
-            raise CommunityScoreError(
-                f"Community score must be less than {COMMUNITY_SCORE_BOUNDS['MAX']}, got {score}"
-            )
+                current_bounds = None
+                if field == 'lm_sys_arena_score':
+                    current_bounds = LM_SYS_ARENA_SCORE_BOUNDS
+                elif field == 'hf_score':
+                    current_bounds = HF_COMMUNITY_SCORE_BOUNDS
+                
+                if current_bounds:
+                    if not (current_bounds["MIN"] <= score_value <= current_bounds["MAX"]):
+                        raise CommunityScoreError(
+                            f"Community score for '{field}' for model '{model_name}' must be between {current_bounds['MIN']} and {current_bounds['MAX']}, got {score_value}"
+                        )
+                else:
+                    # This case should not be reached if REQUIRED_SECTIONS['community_score'] is well-defined
+                    # and corresponding bounds constants exist for each field.
+                    logger.warning(
+                        f"No defined bounds for community score field '{field}' for model '{model_name}'. Skipping bounds check."
+                    )
 
 
 def validate_model_data(data: Dict, model_name: str) -> None:
