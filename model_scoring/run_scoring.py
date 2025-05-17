@@ -58,7 +58,12 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
         # Extract data from JSON
         entity_benchmarks = data.get('entity_benchmarks', {})
         dev_benchmarks = data.get('dev_benchmarks', {})
-        community_score = data.get('community_score', 0)
+        
+        # Extract community score components
+        community_scores_data = data.get('community_score', {}) # Default to empty dict if 'community_score' key is missing
+        lm_sys_elo = community_scores_data.get('lm_sys_arena_score') # Will be None if key 'lm_sys_arena_score' is missing
+        hf_val = community_scores_data.get('hf_score') # Will be None if key 'hf_score' is missing
+        
         model_specs = data.get('model_specs', {})
 
         # Calculate average benchmark performance
@@ -66,25 +71,31 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
             [score for score in entity_benchmarks.values() if score is not None] +
             [score for score in dev_benchmarks.values() if score is not None]
         )
-        avg_performance = sum(available_scores) / len(available_scores) * 100  # Convert to percentage
-
-        # Calculate size/performance ratio
-        size_perf_ratio = scorer.calculate_size_perf_ratio(avg_performance, model_specs['param_count'])
+        avg_performance = sum(available_scores) / len(available_scores) * 100 if available_scores else 0.0 # Convert to percentage, handle empty list
 
         # Calculate scores
         entity_score = scorer.calculate_entity_benchmarks(entity_benchmarks)
         dev_score = scorer.calculate_dev_benchmarks(dev_benchmarks)
         external_score = scorer.calculate_external_benchmarks(entity_benchmarks, dev_benchmarks)
-        community_score = scorer.calculate_community_score(community_score)
+        
+        # Pass the extracted individual scores to the method
+        community_score_val = scorer.calculate_community_score(
+            lm_sys_arena_elo_rating=lm_sys_elo, 
+            hf_score=hf_val
+        )
+        
+        # technical_score now internally calls calculate_size_perf_ratio
         technical_score = scorer.calculate_technical_score(
-            price=model_specs['price'],
-            context_window=model_specs['context_window'],
-            size_perf_ratio=size_perf_ratio
+            price=model_specs.get('price'), # Use .get() for safety
+            context_window=model_specs.get('context_window'),
+            benchmark_score=avg_performance, 
+            param_count=model_specs.get('param_count'),
+            architecture=model_specs.get('architecture')
         )
 
-        # Set scores
+        # Set scores on the scorer instance
         scorer.external_score = external_score
-        scorer.community_score = community_score 
+        scorer.community_score = community_score_val
         scorer.technical_score = technical_score
 
         # Calculate final score
@@ -97,11 +108,12 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
                 'entity_score': entity_score,
                 'dev_score': dev_score,
                 'external_score': external_score,
-                'community_score': community_score,
+                'community_score': community_score_val,
                 'technical_score': technical_score,
                 'final_score': final_score,
                 'avg_performance': avg_performance,
-                'size_perf_ratio': size_perf_ratio
+                # 'size_perf_ratio': size_perf_ratio # This variable is no longer in the same context
+                # The actual points for this component are now part of technical_score
             },
             'input_data': data  # Include input data for reference
         }
