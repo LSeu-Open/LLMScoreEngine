@@ -29,3 +29,4 @@ class ModelSpecifications(TypedDict):
     price: float
     context_window: int
     param_count: float 
+    architecture: str
