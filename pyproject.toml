@@ -19,3 +19,6 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0"
 ] 
+
+[tool.hatch.build.targets.wheel]
+packages = ["model_scoring"] 
