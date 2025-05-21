@@ -233,7 +233,7 @@ Make sure to use the correct model name as it is written on the [Model's page on
 For example, the model name for the 'DeepSeek-R1' model is 'deepseek-ai/DeepSeek-R1'.
 
 ```bash
-python hf_score.py deepseek-ai/DeepSeek-R1
+python model_scoring/scoring/hf_score.py deepseek-ai/DeepSeek-R1
 ```
 
 - `model_specs` : You will find the price on the model's page on the provider's website or on the model's page on the [Hugging Face](https://huggingface.co/) website. Some of this data can also be found on the [Artificial Analysis](https://artificialanalysis.ai/) website.
