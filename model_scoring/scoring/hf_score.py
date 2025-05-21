@@ -1,6 +1,7 @@
 from huggingface_hub import model_info
 from datetime import datetime, timezone
 import math
+import argparse
 
 
 def get_model_downloads(model_name):
@@ -83,8 +84,12 @@ def extract_model_info(model_name):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Get Hugging Face model community score and metrics.")
+    parser.add_argument("model_name", help="Name of the Hugging Face model (e.g., microsoft/Phi-4-mini-reasoning)")
+    args = parser.parse_args()
+
     # Example usage
-    model_name = "deepseek-ai/DeepSeek-V3-0324" # Change this to the model you want to score
+    model_name = args.model_name # Change this to the model you want to score
     
     # Get all metrics at once
     info = extract_model_info(model_name)
