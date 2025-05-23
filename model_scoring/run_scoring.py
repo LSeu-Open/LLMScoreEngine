@@ -60,9 +60,9 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
         dev_benchmarks = data.get('dev_benchmarks', {})
         
         # Extract community score components
-        community_scores_data = data.get('community_score', {}) # Default to empty dict if 'community_score' key is missing
-        lm_sys_elo = community_scores_data.get('lm_sys_arena_score') # Will be None if key 'lm_sys_arena_score' is missing
-        hf_val = community_scores_data.get('hf_score') # Will be None if key 'hf_score' is missing
+        community_scores_data = data.get('community_score', {})
+        lm_sys_elo = community_scores_data.get('lm_sys_arena_score')
+        hf_val = community_scores_data.get('hf_score')
         
         model_specs = data.get('model_specs', {})
 
@@ -86,7 +86,7 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
         
         # technical_score now internally calls calculate_size_perf_ratio
         technical_score = scorer.calculate_technical_score(
-            price=model_specs.get('price'), # Use .get() for safety
+            price=model_specs.get('price'),
             context_window=model_specs.get('context_window'),
             benchmark_score=avg_performance, 
             param_count=model_specs.get('param_count'),
@@ -115,7 +115,7 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
                 # 'size_perf_ratio': size_perf_ratio # This variable is no longer in the same context
                 # The actual points for this component are now part of technical_score
             },
-            'input_data': data  # Include input data for reference
+            'input_data': data
         }
         
         logger.info(f"Successfully completed scoring for model '{model_name}'")
