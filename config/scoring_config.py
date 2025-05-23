@@ -20,10 +20,10 @@ including weights, thresholds, and bounds for different scoring components.
 
 # Maximum points for each category
 SCORE_WEIGHTS = {
-    'entity_benchmarks': 25,  # Maximum points for entity benchmarks
-    'dev_benchmarks': 35,     # Maximum points for dev benchmarks
-    'community_score': 20,    # Maximum points for community score
-    'technical_score': 20     # Maximum points for technical score
+    'entity_benchmarks': 30,
+    'dev_benchmarks': 30,
+    'community_score': 20,
+    'technical_score': 20     
 }
 
 # Thresholds for technical scoring
