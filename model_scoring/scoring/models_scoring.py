@@ -92,20 +92,14 @@ class ModelScorer:
         # Calculate weighted average of available scores
         for bench_key, result in benchmark_scores.items():
             if bench_key in weights and result is not None:
-                # Assuming result is already 0-1 (as per docstring and previous validation steps)
-                # and weights are relative importance (all 10 here means equal)
                 score += (result * weights[bench_key])
                 total_weight_for_scored_benchmarks += weights[bench_key]
             elif bench_key not in weights and result is not None:
-                # Optionally, log a warning for unexpected benchmark keys if they have scores
-                # logger.warning(f"Benchmark key '{bench_key}' not found in defined weights for entity benchmarks.")
                 pass 
                 
         # Scale to 30 points maximum if we have scores
         if total_weight_for_scored_benchmarks > 0:
-            # The average score of the available benchmarks (0-10 scale if weights are 10)
-            average_performance = score / total_weight_for_scored_benchmarks # This is average on a 0-1 scale because result is 0-1 and weights[bench_key] are effectively cancelled out by same sum in denominator.
-            return average_performance * 30.0
+            average_performance = score / total_weight_for_scored_benchmarks
         return 0.0
 
     def calculate_dev_benchmarks(self, benchmark_scores: dict) -> float:
@@ -125,8 +119,6 @@ class ModelScorer:
         if not benchmark_scores:
             return 0.0
             
-        # Define relative weights for each benchmark based on Exploration.md
-        # Total weight sum from Exploration.md is 80 for the Dev Benchs section.
         weights = {
             # General knowledge and reasoning (Total Weight: 28)
             'MMLU': 3,
@@ -256,12 +248,8 @@ class ModelScorer:
         
         if hf_score is not None:
             if lm_sys_arena_elo_rating is None: # HF only case
-                # HF score (input assumed 0-10) contributes 0-20 points
-                # Scale hf_score by 2 and clamp to ensure it's within [0, 20]
                 hf_contribution = max(0.0, min(20.0, hf_score * 2.0))
             else: # HF is present AND ELO is also present
-                # HF score (input assumed 0-10) contributes 0-10 points
-                # Assuming hf_score is already validated/clamped to be within 0-10
                 hf_contribution = hf_score 
             total_score += hf_contribution
             
@@ -313,19 +301,16 @@ class ModelScorer:
             float: Score from 0.0-6.0 based on context size.
                    Returns 0.0 if context_size is None.
         """
-        # This function uses math.log2, ensure 'import math' is at the top of the file.
+
         if context_size is None:
             return 0.0
         
-        if context_size < 8192: # W < 8192, as per Exploration.md
+        if context_size < 8192:
             return 1.0
-        else: # W >= 8192
-            # Formula from Exploration.md: Points ≈ 0.571 * log2(W) - 5.929
-            # Calculation: Points = max(1.0, min(6.0, 0.571 * log2(W) - 5.929))
+        else:
             
             raw_score_from_formula = 0.571 * math.log2(context_size) - 5.929
             
-            # Apply bounds as per the "Calculation" line in Exploration.md
             context_score = max(1.0, min(6.0, raw_score_from_formula))
             
             return context_score
@@ -348,13 +333,7 @@ class ModelScorer:
         if benchmark_score is None or param_count is None or architecture is None:
             return 0.0 # Or handle as an error/default appropriately
 
-        # 1. Determine Base Size Factor from Exploration.md
-        # - < 3B parameters: 1.00
-        # - 3B - 10B parameters: 0.95
-        # - 10B - 30B parameters: 0.90
-        # - 30B - 80B parameters: 0.80
-        # - 80B - 200B parameters: 0.70
-        # - > 200B parameters: 0.60
+        # 1. Determine Base Size Factor
         if param_count < 3_000_000_000:
             base_size_factor = 1.00
         elif param_count < 10_000_000_000:
@@ -368,11 +347,7 @@ class ModelScorer:
         else: # > 200B
             base_size_factor = 0.60
 
-        # 2. Determine Architecture Factor from Exploration.md
-        # - Mixture of Experts (MoE) models: 1.2
-        # - State Space Models (SSM): 1.1
-        # - Dense Transformer models: 1.0
-        # - Other specialized efficient architectures: 1.1
+        # 2. Determine Architecture Factor
         arch_lower = architecture.lower()
         if "moe" in arch_lower:
             architecture_factor = 1.2
@@ -389,11 +364,9 @@ class ModelScorer:
         total_efficiency_factor = base_size_factor * architecture_factor
 
         # 4. Calculate Combined Score
-        # benchmark_score is already 0-100, so divide by 100
         combined_score = (benchmark_score / 100.0) * total_efficiency_factor
 
         # 5. Calculate Final Points using the linear formula with bounds
-        # Points = max(1.0, min(6.0, 1.0 + 5.0 * Combined Score))
         points = max(1.0, min(6.0, 1.0 + (5.0 * combined_score)))
 
         return points
