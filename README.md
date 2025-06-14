@@ -43,17 +43,32 @@ LLMScoreEngine/
 ├── config/                    # Configuration files
 │   └── scoring_config.py      # Scoring parameters and thresholds
 ├── model_scoring/             # Main package
-│   ├── core/                  # Core functionality
-│   ├── data/                  # Data handling
+│   ├── core/                  # Core functionality (exceptions, types, constants)
+│   ├── data/                  # Data handling (loaders, validators)
+│   │   ├── loaders.py
+│   │   └── validators.py
 │   ├── scoring/               # Scoring logic
+│   │   ├── hf_score.py
+│   │   └── models_scoring.py
 │   ├── utils/                 # Utility functions
+│   │   ├── config_loader.py
+│   │   └── logging.py
+│   ├── __init__.py
 │   └── run_scoring.py         # Script for running scoring programmatically
 ├── Models/                    # Model data directory (Create this manually)
 ├── Results/                   # Results directory (Created automatically)
 ├── tests/                     # Unit and integration tests
-│   ├── test_model_scorer.py
-│   ├── test_scoring.py
-│   └── test_validators.py
+│   ├── config/
+│   │   └── test_scoring_config.py
+│   ├── data/
+│   │   └── test_validators.py
+│   ├── scoring/
+│   │   ├── test_hf_score.py
+│   │   └── test_models_scoring.py
+│   ├── utils/
+│   │   └── test_config_loader.py
+│   ├── __init__.py
+│   └── test_run_scoring.py
 ├── LICENSE                    # Project license file
 ├── README.md                  # This file
 ├── pyproject.toml             # Project configuration (for build system, linters, etc.)
@@ -220,7 +235,7 @@ All other fields are optional and can remain null if data is not available.
 
 You can find the 'hf_score.py' script in the **model_scoring/scoring** folder.
 
-**Note**: To use the 'hf_score.py' script, you will need to install the 'huggingface_hub' library if it's not already installed.
+**Note**: To use the 'hf_score.py' script, you will need to install the 'huggingface_hub' library if it's not already installed when you create the virtual environment.
 
 ```bash
 pip install huggingface_hub
@@ -240,50 +255,42 @@ python model_scoring/scoring/hf_score.py deepseek-ai/DeepSeek-R1
 
 ## Usage
 
-### IDE Usage
+### Command-Line Usage
 
-- Open the `score_models.py` file
-- Update the `models` list with the models you want to score (You can add as many models as you want)
-- You can run the script in several ways:
-  - Click the "Run" button in the top-right corner
-  - Use the Run and Debug view (Ctrl+Shift+D or Cmd+Shift+D)
-  - Right-click in the editor and select "Run Python File in Terminal"
+You can run the scoring script from your terminal.
 
-### Command Line Interface
+**Score specific models:**
 
-You can add as many models as you want. Make sure to add the models in the `Models` folder first.
-
-The scoring system can be used via the command line with the following options:
+Provide the names of the models (without the `.json` extension) as arguments:
 
 ```bash
-# Score specific models
-python score_models.py model1 model2 model3
-
-# Show help
-python score_models.py --help
-
-# Show version
-python score_models.py --version
-
-# Enable verbose logging
-python score_models.py -v model1 model2
+python score_models.py ModelName1 ModelName2
 ```
 
-### Programmatic Usage
+**Score all models:**
 
-You can also use the scoring system programmatically:
+Use the `--all` flag to score all models present in the `Models` directory.
 
-```python
-from model_scoring.run_scoring import batch_process_models
-
-# Score specific models
-models = ["model1", "model2", "model3"]
-batch_process_models(models)
-
-# Or use the main function
-from score_models import main
-main(models)
+```bash
+python score_models.py --all
 ```
+
+See the following section for more options to customize the behavior.
+
+### Command-Line Options
+
+You can customize the scoring process with the following optional flags:
+
+| Flag                 | Description                                                                                             | Example                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `--all`              | Score all models found in the `Models/` directory.                                                      | `python score_models.py --all`                      |
+| `--quiet`            | Suppress all informational output and only print the final scores in the console. Useful for scripting. | `python score_models.py --all --quiet`              |
+| `--config <path>`    | Path to a custom Python configuration file to override the default scoring parameters.                  | `python score_models.py ModelName --config my_config.py` |
+| `--csv`              | Generate a CSV report from existing results.                                                            | `python score_models.py --csv`                      |
+
+### IDE Usage
+
+If you prefer to run the script from your IDE without command-line arguments, you can modify `score_models.py` directly. However, using the command-line interface is the recommended approach for flexibility.
 
 ## Results Data Format
 
