@@ -1,70 +1,110 @@
+# ------------------------------------------------------------------------------------------------
+# License
+# ------------------------------------------------------------------------------------------------
+
+# Copyright (c) 2025 LSeu-Open
+# 
+# This code is licensed under the MIT License.
+# See LICENSE file in the root directory
+
+# ------------------------------------------------------------------------------------------------
+# Description
+# ------------------------------------------------------------------------------------------------
+
+"""
+Hugging Face Community Score Calculation.
+
+This module provides a function to calculate the community score for a model
+based on its downloads, likes, and age.
+"""
+
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
 from huggingface_hub import model_info
 from datetime import datetime, timezone
 import math
 import argparse
 
+import sys
+from pathlib import Path
 
-def get_model_downloads(model_name):
-    """Get the last 30 days downloads for a model"""
-    model = model_info(model_name)
-    return model.downloads
+# Add project root to sys.path for absolute imports, making the script runnable.
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
+from config.scoring_config import HUGGING_FACE_SCORE_PARAMS
 
-def get_model_likes(model_name):
-    """Get the number of likes for a model"""
-    model = model_info(model_name)
-    return model.likes
+# ------------------------------------------------------------------------------------------------
+# Hugging Face Community Score Functions
+# ------------------------------------------------------------------------------------------------
 
+def _calculate_download_score(downloads: int) -> float:
+    """Calculates the download score based on the formula in scoring_framework.md."""
+    params = HUGGING_FACE_SCORE_PARAMS['downloads']
+    if downloads < params['min_downloads']:
+        return 0.0
+    
+    log_val = math.log(downloads) / math.log(params['log_base'])
+    score = params['coefficient'] * log_val + params['intercept']
+    return max(0.0, min(params['max_points'], score))
 
-def get_model_age(model_name):
-    """Get the age of a model in weeks and months"""
+def _calculate_likes_score(likes: int) -> float:
+    """Calculates the likes score based on the formula in scoring_framework.md."""
+    params = HUGGING_FACE_SCORE_PARAMS['likes']
+    if likes < params['min_likes']:
+        return 0.0
+        
+    log_val = math.log(likes) / math.log(params['log_base'])
+    score = params['coefficient'] * log_val + params['intercept']
+    return max(0.0, min(params['max_points'], score))
+
+def _calculate_age_score(age_months: float) -> float:
+    """Calculates the age/maturity score based on the formula in scoring_framework.md."""
+    params = HUGGING_FACE_SCORE_PARAMS['age_months']
+    
+    if 0 <= age_months < params['tier1_months']:
+        score = params['tier1_slope'] * age_months
+    elif params['tier1_months'] <= age_months < params['tier2_months']:
+        score = params['tier2_base_points'] + params['tier2_slope'] * (age_months - params['tier1_months'])
+    elif params['tier2_months'] <= age_months <= params['tier3_months']:
+        score = params['tier3_base_points'] + params['tier3_slope'] * (age_months - params['tier2_months'])
+    else:  # age_months > params['tier3_months']
+        score = params['stable_points']
+        
+    return max(0.0, min(params['max_points'], score))
+
+def get_model_downloads(model_name: str) -> int:
+    """Get the last 30 days downloads for a model."""
+    return model_info(model_name).downloads
+
+def get_model_likes(model_name: str) -> int:
+    """Get the number of likes for a model."""
+    return model_info(model_name).likes
+
+def get_model_age(model_name: str) -> tuple[int, float]:
+    """Get the age of a model in weeks and months."""
     model = model_info(model_name)
     created_at = model.created_at
     now = datetime.now(timezone.utc)
     age_delta = now - created_at
     age_weeks = age_delta.days // 7
-    age_months = age_delta.days // 30
+    age_months = age_delta.days / 30.437 # Average number of days in a month
     return age_weeks, age_months
 
-
-def compute_hf_score(model_info):
-    """Improved scoring formula with better discrimination for less popular models"""
-    downloads = model_info["downloads in last 30 days"]
-    likes = model_info["total likes"]
-    age_weeks = model_info["age in weeks"]
+def compute_hf_score(model_info: dict) -> float:
+    """Computes the total Hugging Face Community Score based on documentation."""
+    download_score = _calculate_download_score(model_info["downloads in last 30 days"])
+    likes_score = _calculate_likes_score(model_info["total likes"])
+    age_score = _calculate_age_score(model_info["age in months"])
     
-    # Enhanced download scaling (0-4 points)
-    # Better differentiation across orders of magnitude
-    if downloads <= 0:
-        download_score = 0
-    else:
-        log_downloads = math.log10(downloads)
-        # Base points for different tiers
-        if log_downloads < 1:  # <10 downloads
-            download_score = 0
-        elif log_downloads < 3:  # 10-999 downloads
-            download_score = log_downloads / 3  # 0-1 points
-        elif log_downloads < 5:  # 1K-99K downloads
-            download_score = 1 + (log_downloads - 3) / 1  # 1-3 points
-        else:  # 100K+ downloads
-            download_score = 3 + min(1, (log_downloads - 5) / 2)  # 3-4 points
+    total_score = download_score + likes_score + age_score
+    return round(total_score, 2)
 
-    download_score = min(4, download_score)
-    
-    # Stricter likes scaling (0-4 points)
-    # Requires >1,000 likes to get full points
-    likes_score = min(4, 0 if likes <= 0 else max(0, (math.log10(max(1, likes)) - 0.5) / 0.75))
-    
-    # More restrictive age scoring (0-2 points)
-    # Rewards models between 3-12 months old
-    age_score = min(2, max(0, (age_weeks - 4) / 12) if age_weeks < 16 else 
-                   (2.0 if age_weeks < 52 else max(0.5, 2.0 - (age_weeks - 52) / 104)))
-    
-    return round(download_score + likes_score + age_score, 1)
-
-
-def extract_model_info(model_name):
-    """Extract all information for a model and return as a dictionary"""
+def extract_model_info(model_name: str) -> dict:
+    """Extract all information for a model and return as a dictionary."""
     downloads = get_model_downloads(model_name)
     likes = get_model_likes(model_name)
     age_weeks, age_months = get_model_age(model_name)
@@ -82,6 +122,9 @@ def extract_model_info(model_name):
     
     return info
 
+# ------------------------------------------------------------------------------------------------
+# Main function
+# ------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Get Hugging Face model community score and metrics.")
