@@ -18,19 +18,39 @@ This module provides validation mechanisms for model data, ensuring that
 the data conforms to the expected structure and constraints.
 """
 
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
 from typing import Dict, Any, Optional
 import logging
+from types import ModuleType
+import sys
+from pathlib import Path
 
-from ..core.constants import SCORE_BOUNDS, REQUIRED_SECTIONS, SCORE_SCALE, LM_SYS_ARENA_SCORE_BOUNDS, HF_COMMUNITY_SCORE_BOUNDS
-from ..core.exceptions import BenchmarkScoreError, ModelSpecificationError, CommunityScoreError, ModelDataValidationError
+# Add project root to sys.path for absolute imports.
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from model_scoring.core.constants import REQUIRED_SECTIONS
+from model_scoring.core.exceptions import BenchmarkScoreError, ModelSpecificationError, CommunityScoreError, ModelDataValidationError
+from config import scoring_config as default_scoring_config
+
+# ------------------------------------------------------------------------------------------------
+# Validation class and functions
+# ------------------------------------------------------------------------------------------------
 
 logger = logging.getLogger(__name__)
 
 class ModelDataValidator:
     """Class to handle model data validation"""
     
-    @staticmethod
-    def validate_benchmarks(data: Dict, section: str, model_name: str) -> None:
+    def __init__(self, scoring_config: ModuleType):
+        """Initializes the validator with a scoring configuration."""
+        self.config = scoring_config
+
+    def validate_benchmarks(self, data: Dict, section: str, model_name: str) -> None:
         """
         Validates benchmark scores for a specific section of model data.
 
@@ -48,7 +68,7 @@ class ModelDataValidator:
 
         Notes:
             - All scores are normalized by dividing by SCORE_SCALE
-            - Valid scores must be between SCORE_BOUNDS["MIN"] and SCORE_BOUNDS["MAX"]
+            - Valid scores must be between SCORE_BOUNDS["min"] and SCORE_BOUNDS["max"]
             - Scores can be None, which indicates benchmark was not run
         """
         # Verify section exists and is a dictionary
@@ -75,13 +95,13 @@ class ModelDataValidator:
                     )
                 
                 # Verify score is within valid bounds
-                if score < SCORE_BOUNDS["MIN"] or score > SCORE_BOUNDS["MAX"]:
+                if score < self.config.SCORE_BOUNDS["min"] or score > self.config.SCORE_BOUNDS["max"]:
                     raise BenchmarkScoreError(
-                        f"Score for '{field}' in {section} must be between {SCORE_BOUNDS['MIN']} and {SCORE_BOUNDS['MAX']}, got {score}"
+                        f"Score for '{field}' in {section} must be between {self.config.SCORE_BOUNDS['min']} and {self.config.SCORE_BOUNDS['max']}, got {score}"
                     )
                 
                 # Normalize score
-                data[section][field] = score/SCORE_SCALE
+                data[section][field] = score / self.config.SCORE_SCALE
 
     @staticmethod
     def validate_model_specs(specs: Dict, model_name: str) -> None:
@@ -139,8 +159,7 @@ class ModelDataValidator:
                     f"Specification '{field}' must be positive for '{model_name}', got {specs[field]}"
                 )
 
-    @staticmethod
-    def validate_community_score(scores_data: Dict[str, Any], model_name: str) -> None:
+    def validate_community_score(self, scores_data: Dict[str, Any], model_name: str) -> None:
         """Validate the community scores for a language model.
         
         This method checks that the community_score section is a dictionary
@@ -183,16 +202,11 @@ class ModelDataValidator:
                         f"Invalid type for community score '{field}' for model '{model_name}': expected number, got {type(score_value).__name__}"
                     )
 
-                current_bounds = None
-                if field == 'lm_sys_arena_score':
-                    current_bounds = LM_SYS_ARENA_SCORE_BOUNDS
-                elif field == 'hf_score':
-                    current_bounds = HF_COMMUNITY_SCORE_BOUNDS
-                
-                if current_bounds:
-                    if not (current_bounds["MIN"] <= score_value <= current_bounds["MAX"]):
+                if field in self.config.COMMUNITY_SCORE_BOUNDS:
+                    bounds = self.config.COMMUNITY_SCORE_BOUNDS[field]
+                    if not (bounds["min"] <= score_value <= bounds["max"]):
                         raise CommunityScoreError(
-                            f"Community score for '{field}' for model '{model_name}' must be between {current_bounds['MIN']} and {current_bounds['MAX']}, got {score_value}"
+                            f"Community score for '{field}' for model '{model_name}' must be between {bounds['min']} and {bounds['max']}, got {score_value}"
                         )
                 else:
                     # This case should not be reached if REQUIRED_SECTIONS['community_score'] is well-defined
@@ -202,18 +216,20 @@ class ModelDataValidator:
                     )
 
 
-def validate_model_data(data: Dict, model_name: str) -> None:
+def validate_model_data(data: Dict, model_name: str, scoring_config: Optional[ModuleType] = None) -> None:
     """
     Validate all model data for a given model.
     
     Args:
         data (Dict): The model data dictionary to validate
         model_name (str): Name of the model being validated
+        scoring_config (ModuleType, optional): A loaded configuration module.
         
     Raises:
         ModelDataValidationError: If any validation check fails
     """
-    validator = ModelDataValidator()
+    config = scoring_config if scoring_config is not None else default_scoring_config
+    validator = ModelDataValidator(scoring_config=config)
     
     # Verify all required sections exist
     for section in REQUIRED_SECTIONS:
