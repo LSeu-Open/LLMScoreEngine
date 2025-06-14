@@ -12,92 +12,196 @@
 # ------------------------------------------------------------------------------------------------
 
 """
-Scoring configuration for the model scoring system.
+Scoring Algorithm Configuration.
 
-This module contains all the configurable parameters for the scoring system,
-including weights, thresholds, and bounds for different scoring components.
+This module serves as the central hub for all tunable parameters of the model
+scoring algorithm. It contains the weights, thresholds, and bounds that
+directly influence how a model's final score is calculated.
+
+Adjusting the values in this file will change the scoring outcomes without
+requiring any modification to the core scoring logic.
 """
 
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+import types
+
+# ------------------------------------------------------------------------------------------------
+# General constants
+# ------------------------------------------------------------------------------------------------
+
+# Score scale and bounds
+SCORE_SCALE = 100
+SCORE_BOUNDS = types.MappingProxyType({
+    "min": 0,
+    "max": 100
+})
+
 # Maximum points for each category
-SCORE_WEIGHTS = {
+SCORE_WEIGHTS = types.MappingProxyType({
     'entity_benchmarks': 30,
     'dev_benchmarks': 30,
     'community_score': 20,
     'technical_score': 20     
-}
+})
 
-# Thresholds for technical scoring
-SCORE_THRESHOLDS = {
-    'price': {
-        'excellent': 1,    # < 1 USD per million tokens
-        'good': 3,         # < 3 USD
-        'fair': 5,         # < 5 USD
-        'poor': 10,        # < 10 USD
-        'bad': 20,         # < 20 USD
-        'very_bad': 40,    # < 40 USD
-        'worst': 80        # < 80 USD
-    },
-    'context_window': {
-        'excellent': 200000,  # > 200k tokens
-        'good': 128000,       # > 128k tokens
-        'fair': 64000,        # > 64k tokens
-        'poor': 32000,        # > 32k tokens
-        'bad': 16000,         # > 16k tokens
-        'very_bad': 8000,     # > 8k tokens
-        'worst': 4000         # > 4k tokens
-    },
-    'size_perf_ratio': {
-        'excellent': 90,  # > 90%
-        'good': 80,       # > 80%
-        'fair': 70,       # > 70%
-        'poor': 60,       # > 60%
-        'bad': 50,        # > 50%
-        'very_bad': 40,   # > 40%
-        'worst': 30       # > 30%
-    }
-}
+# ------------------------------------------------------------------------------------------------
+# Entity and dev benchmarks constants
+# ------------------------------------------------------------------------------------------------
 
 # Weights for different benchmarks
-BENCHMARK_WEIGHTS = {
-    'entity_benchmarks': {
-        'artificial_analysis': 25,
-        'live_code_bench': 25,
-        'big_code_models': 25,
-        'open_llm': 25
-    },
-    'dev_benchmarks': {
+BENCHMARK_WEIGHTS = types.MappingProxyType({
+    'entity_benchmarks': types.MappingProxyType({
+        'artificial_analysis': 10, # Generalist
+        'OpenCompass': 10, # Generalist
+        'Dubesord_LLM': 10, # Generalist
+        'LLM Explorer': 10, # Generalist
+        'Livebench': 10, # Generalist
+        'open_llm': 10, # Generalist
+        'UGI Leaderboard': 10, # Censor
+        'big_code_bench': 10, # Coding
+        'EvalPlus Leaderboard': 10, # Coding
+        'Open VLM': 10 # Vision
+    }),
+    'dev_benchmarks': types.MappingProxyType({
+        # General knowledge and reasoning
         'MMLU': 3.0,
-        'MMLU Pro': 8.0,
-        'BigBench': 3.0,
-        'DROP': 7.0,
-        'HellaSwag': 7.0,
-        'GPQA': 2.0,
-        'ARC-C': 2.0,
-        'LiveBench': 1.5,
-        'LatestEval': 1.5,
-        'AlignBench': 4.0,
-        'Wild Bench': 4.0,
-        'MT-bench': 4.0,
-        'IFEval': 4.0,
-        'Arena-Hard': 4.5,
-        'TruthfulQA': 4.5,
-        'MATH': 4.0,
-        'GSM-8K': 4.0,
-        'MGSM': 7.0,
-        'HumanEval': 3.0,
-        'HumanEval Plus': 3.0,
-        'MBPP': 3.0,
-        'MBPP Plus': 3.0,
-        'SWE-bench': 2.0,
-        'API-Bank': 2.0,
-        'BFCL': 5.0,
-        'Gorilla Benchmark': 2.0,
-        'Nexus': 2.0
-    }
-}
+        'MMLU Pro': 5.0,
+        'BigBenchHard': 3.0,
+        'GPQA diamond': 7.0,
+        'DROP': 3.0,
+        'Humanity\'s Last Exam': 4.0,
+        'HellaSwag': 3.0,
+        'ARC-C': 3.0,
+        # Instruction following
+        'Wild Bench': 3.0,
+        'MT-bench': 3.0,
+        'IFEval': 3.0,
+        'Arena-Hard': 3.0,
+        # Math
+        'MATH': 3.0,
+        'GSM-8K': 3.0,
+        'AIME': 4.0,
+        # Coding
+        'HumanEval': 1.0,
+        'MBPP': 1.0,
+        'LiveCodeBench': 4.0,
+        'Aider Polyglot': 2.0,
+        'SWE-Bench': 2.0,
+        'SciCode': 3.0,
+        # Multilingual
+        'MGSM': 2.0,
+        'MMMLU': 2.0,
+        'C-Eval or CMMLU': 2.0,
+        'AraMMLu': 2.0,
+        # Context
+        'LongBench': 2.0,
+        'RULER 128K': 2.0,
+        'RULER 32K': 2.0,
+        'MTOB': 2.0,
+        # Function calling (tool use and agent)
+        'BFCL': 3.0,
+        'AgentBench': 2.0,
+        'Gorilla Benchmark': 1.0,
+        'ToolBench': 2.0,
+        'MINT': 2.0,
+        # Vision
+        'MMMU': 2.0,
+        'Mathvista': 3.0,
+        'ChartQA': 1.0,
+        'DocVQA': 1.0,
+        'AI2D': 1.0
+    })
+})
 
-# Bounds for community score calculation
-COMMUNITY_SCORE_BOUNDS = {
-    'min_elo': 1000,  # Minimum expected ELO rating
-    'max_elo': 1402   # Maximum expected ELO rating
-} 
+# ------------------------------------------------------------------------------------------------
+# Technical scoring constants
+# ------------------------------------------------------------------------------------------------
+
+TECHNICAL_SCORE_PARAMS = types.MappingProxyType({
+    'price': types.MappingProxyType({
+        'max_points': 8.0,
+        'coefficient': 0.35,
+        'intercept': 8.0,
+        'high_price_cutoff': 20.0,
+        'high_price_points': 1.0,
+    }),
+    'context_window': types.MappingProxyType({
+        'max_points': 6.0,
+        'coefficient': 0.571,
+        'intercept': -5.929,
+        'log_base': 2,
+        'low_cw_cutoff': 8192,
+        'low_cw_points': 1.0,
+    }),
+    'size_perf_ratio': types.MappingProxyType({
+        'max_points': 6.0,
+        'base_points': 1.0,
+        'scaling_factor': 5.0,
+        'size_tiers': types.MappingProxyType({
+            # size_limit: factor
+            3_000_000_000: 1.00,
+            10_000_000_000: 0.95,
+            30_000_000_000: 0.90,
+            80_000_000_000: 0.80,
+            200_000_000_000: 0.70,
+        }),
+        'default_size_factor': 0.60
+    })
+})
+
+MODEL_ARCHITECTURE_FACTORS = types.MappingProxyType({
+    # architecture_keyword: factor
+    'moe': 1.2,
+    'ssm': 1.1,
+    'dense': 1.0,
+    'specialized': 1.1,
+    'efficient': 1.1,
+    'default': 1.0
+})
+
+# ------------------------------------------------------------------------------------------------
+# Community score constants
+# ------------------------------------------------------------------------------------------------
+
+# Bounds for community score components
+COMMUNITY_SCORE_BOUNDS = types.MappingProxyType({
+    'lm_sys_arena_score': types.MappingProxyType({
+        'min': 1000,  # Minimum expected ELO rating
+        'max': 1500   # Maximum expected ELO rating
+    }),
+    'hf_score': types.MappingProxyType({
+        'min': 0, # Minimum Hugging Face score
+        'max': 10 # Maximum Hugging Face score
+    })
+})
+
+HUGGING_FACE_SCORE_PARAMS = types.MappingProxyType({
+    'downloads': types.MappingProxyType({
+        'log_base': 2,
+        'coefficient': 0.2007,
+        'intercept': -0.6667,
+        'min_downloads': 10,
+        'max_points': 4.0
+    }),
+    'likes': types.MappingProxyType({
+        'log_base': 2,
+        'coefficient': 0.477,
+        'intercept': -0.756,
+        'min_likes': 3,
+        'max_points': 4.0
+    }),
+    'age_months': types.MappingProxyType({
+        'tier1_months': 1,
+        'tier1_slope': 0.5,
+        'tier2_months': 3,
+        'tier2_base_points': 0.5,
+        'tier2_slope': 0.5,
+        'tier3_months': 12,
+        'tier3_base_points': 1.5,
+        'tier3_slope': (0.5 / 9),
+        'stable_points': 1.5,
+        'max_points': 2.0
+    })
+}) 
