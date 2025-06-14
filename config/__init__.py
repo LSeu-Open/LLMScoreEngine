@@ -20,7 +20,11 @@ including scoring weights, thresholds, and other configurable parameters.
 
 from .scoring_config import (
     SCORE_WEIGHTS,
-    SCORE_THRESHOLDS,
     BENCHMARK_WEIGHTS,
-    COMMUNITY_SCORE_BOUNDS
+    COMMUNITY_SCORE_BOUNDS,
+    HUGGING_FACE_SCORE_PARAMS,
+    TECHNICAL_SCORE_PARAMS,
+    MODEL_ARCHITECTURE_FACTORS,
+    SCORE_SCALE,
+    SCORE_BOUNDS
 ) 
