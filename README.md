@@ -106,16 +106,21 @@ source .venv/bin/activate
 
 **Step 3:** Install the dependencies:
 
-Using uv (recommended):
-
+**For standard usage:**
 ```bash
 uv pip install -e .
+```
+
+**For development (including testing):**
+```bash
+uv pip install -e ".[dev]"
 ```
 
 Or using pip:
 
 ```bash
 pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ## Model Data Setup
