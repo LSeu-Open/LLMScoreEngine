@@ -18,7 +18,6 @@ A comprehensive system for evaluating and scoring large language models
 based on multiple criteria including benchmark performance, community
 ratings, and technical specifications.
 
-This is the Alpha v0.3 of the scoring system.
 """
 
 from .scoring.models_scoring import ModelScorer
@@ -26,7 +25,7 @@ from .run_scoring import batch_process_models
 from .data.loaders import load_model_data
 from .data.validators import validate_model_data
 
-__version__ = "0.3.2"
+__version__ = "0.5.0"
 __author__ = "LSeu-Open"
 
 __all__ = [
