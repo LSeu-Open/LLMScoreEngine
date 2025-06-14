@@ -1,28 +1,31 @@
+# ------------------------------------------------------------------------------------------------
+# License
+# ------------------------------------------------------------------------------------------------
+
+# Copyright (c) 2025 LSeu-Open
+# 
+# This code is licensed under the MIT License.
+# See LICENSE file in the root directory
+
+# ------------------------------------------------------------------------------------------------
+# Description
+# ------------------------------------------------------------------------------------------------
+
 """
-Constants for the model scoring system.
+Static Application Constants.
 
-This module defines the constants used throughout the scoring system,
-including score bounds, required sections for validation, and directory paths.
+This module defines static constants for the model scoring application.
+These values are not expected to change frequently and are related to the
+application's structure and data validation rules, not the scoring algorithm itself.
+
+This includes directory paths for models and results, and the validation schemas
+(REQUIRED_SECTIONS) that define the expected structure of input model data.
+For tunable scoring parameters (weights, thresholds), see `config.scoring_config`.
 """
 
-# Score scale and bounds
-SCORE_SCALE = 100
-
-SCORE_BOUNDS = {
-    "MIN": 0,
-    "MAX": 100
-}
-
-# Bounds for individual components of the community score
-LM_SYS_ARENA_SCORE_BOUNDS = {
-    "MIN": 1000,
-    "MAX": 1500
-}
-
-HF_COMMUNITY_SCORE_BOUNDS = {
-    "MIN": 0,
-    "MAX": 10
-}
+# ------------------------------------------------------------------------------------------------
+# Constants
+# ------------------------------------------------------------------------------------------------
 
 # Directory and file constants
 MODELS_DIR = "Models"
@@ -34,13 +37,13 @@ REQUIRED_SECTIONS = {
     'entity_benchmarks': [
         'artificial_analysis',
         'OpenCompass',
+        'Dubesord_LLM',
         'LLM Explorer',
         'Livebench',
         'open_llm',
         'UGI Leaderboard',
         'big_code_bench',
-        'EvalPlus Leaderboard',
-        'Dubesord_LLM',
+        'EvalPlus Leaderboard',        
         'Open VLM',
     ],
     'dev_benchmarks': [
