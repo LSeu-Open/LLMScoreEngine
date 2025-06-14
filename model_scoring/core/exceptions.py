@@ -1,9 +1,26 @@
+# ------------------------------------------------------------------------------------------------
+# License
+# ------------------------------------------------------------------------------------------------
+
+# Copyright (c) 2025 LSeu-Open
+# 
+# This code is licensed under the MIT License.
+# See LICENSE file in the root directory
+
+# ------------------------------------------------------------------------------------------------
+# Description
+# ------------------------------------------------------------------------------------------------
+
 """
 Custom exceptions for the model scoring system.
 
 This module defines a hierarchy of exception classes to provide
 more detailed error information and better error handling.
 """
+
+# ------------------------------------------------------------------------------------------------
+# Exceptions
+# ------------------------------------------------------------------------------------------------
 
 class ModelScoringError(Exception):
     """Base exception for all model scoring errors"""
