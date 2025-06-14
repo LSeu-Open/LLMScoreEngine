@@ -1,6 +1,6 @@
 [project]
-name = "model-scoring-system"
-version = "0.4.0"
+name = "LLM-Scoring-Engine"
+version = "0.5.0"
 description = "A comprehensive system for evaluating and scoring large language models based on multiple criteria."
 dependencies = [
     "typing_extensions>=4.0.0",
