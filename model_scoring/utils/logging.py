@@ -65,7 +65,7 @@ def configure_logging(level=logging.INFO, log_file=LOG_FILE, console_output=True
     logger = logging.getLogger(__name__)
     return logger
 
-def configure_console_only_logging(level=logging.INFO):
+def configure_console_only_logging(level=logging.INFO, quiet=False):
     """
     Configure logging with only console output and simplified formatting.
     
@@ -73,6 +73,7 @@ def configure_console_only_logging(level=logging.INFO):
     
     Args:
         level (int): Logging level (default: logging.INFO)
+        quiet (bool): If True, suppress INFO-level messages.
         
     Returns:
         logging.Logger: Configured logger instance
@@ -81,9 +82,12 @@ def configure_console_only_logging(level=logging.INFO):
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
         
+    # Suppress INFO messages in quiet mode
+    log_level = logging.ERROR if quiet else level
+        
     # Configure basic logging with simplified format
     logging.basicConfig(
-        level=level,
+        level=log_level,
         format='%(message)s',
         force=True  # Force override any existing configuration
     )
