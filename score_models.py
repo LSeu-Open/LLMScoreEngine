@@ -21,9 +21,13 @@
 # ------------------------------------------------------------------------------------------------
 
 import argparse
+import os
 from typing import List
 from model_scoring.run_scoring import batch_process_models
 from model_scoring.utils.logging import configure_console_only_logging
+from model_scoring.utils.config_loader import load_config_from_path
+from model_scoring.csv_reporter import generate_csv_report
+from config import scoring_config as default_scoring_config
 
 # ------------------------------------------------------------------------------------------------
 # CLI Setup
@@ -43,15 +47,34 @@ def parse_args() -> argparse.Namespace:
     )
     
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose logging"
+        '--all',
+        action='store_true',
+        help='Score all models in the Models folder.'
+    )
+    
+    parser.add_argument(
+        '--quiet',
+        action='store_true',
+        help='Suppress all informational output and only show the final scores.'
+    )
+    
+    parser.add_argument(
+        '--config',
+        type=str,
+        default=None,
+        help='Path to a custom scoring configuration file.'
+    )
+    
+    parser.add_argument(
+        '--csv',
+        action='store_true',
+        help='Generate a CSV report from the results.'
     )
     
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s Beta v1.0"
+        version="%(prog)s Beta v0.5"
     )
     
     return parser.parse_args()
@@ -60,30 +83,47 @@ def parse_args() -> argparse.Namespace:
 # Main script
 # ------------------------------------------------------------------------------------------------
 
-def main(models: List[str] = None) -> None:
+def main() -> None:
     """
     Main function to run the scoring system.
     
     Args:
         models: List of model names to process. If None, uses default models.
     """
+    args = parse_args()
     try:
+        if args.csv:
+            generate_csv_report()
+            print("[*] CSV report generated successfully.")
+            return
+
+        # Load scoring configuration
+        if args.config:
+            print(f"[*] Loading custom configuration from: {args.config}")
+            scoring_config = load_config_from_path(args.config)
+        else:
+            scoring_config = default_scoring_config
+
         # Configure logging
-        configure_console_only_logging()
+        configure_console_only_logging(quiet=args.quiet)
+
+        model_names = []
+        if args.all:
+            model_names = [f.split('.')[0] for f in os.listdir('Models') if f.endswith('.json')]
+        elif args.models:
+            model_names = args.models
         
         # Use provided models
-        model_names = models or []
         if not model_names:
-            print("\n[-] No models specified. Please provide at least one model name")
+            print("\n[-] No models specified. Please provide at least one model name or use the --all flag.")
             return
 
         # Run batch processing
-        batch_process_models(model_names)
+        batch_process_models(model_names, quiet=args.quiet, scoring_config=scoring_config)
             
     except Exception as e:
         print(f"\n[-] Processing failed: {str(e)}")
         raise
 
 if __name__ == "__main__":
-    args = parse_args()
-    main(args.models)
+    main()
