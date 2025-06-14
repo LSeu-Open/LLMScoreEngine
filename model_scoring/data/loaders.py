@@ -17,16 +17,25 @@ Data loading utilities for model data.
 This module provides functions for loading model data from JSON files.
 """
 
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
 import os
 import json
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+from types import ModuleType
 
 from ..core.constants import MODELS_DIR
 from ..core.types import ModelData
 from .validators import validate_model_data
 
 logger = logging.getLogger(__name__)
+
+# ------------------------------------------------------------------------------------------------
+# Functions
+# ------------------------------------------------------------------------------------------------
 
 def find_model_file(model_name: str, models_directory: str = MODELS_DIR) -> Optional[str]:
     """Locate the JSON file for a given model in the models directory.
@@ -52,15 +61,33 @@ def find_model_file(model_name: str, models_directory: str = MODELS_DIR) -> Opti
         logger.error(f"Models directory '{models_directory}' not found")
         return None
 
-    # Try exact match first (case-sensitive)
-    json_file = os.path.join(models_directory, f"{model_name}.json")
-    if os.path.exists(json_file):
-        return json_file
+    target_exact = f"{model_name}.json"
+    target_lower = f"{model_name.lower()}.json"
+    
+    found_filename = None
+    
+    # Get all files to avoid repeated os calls and handle casing correctly
+    try:
+        filenames = os.listdir(models_directory)
+    except OSError as e:
+        logger.error(f"Could not read models directory '{models_directory}': {e}")
+        return None
 
-    # Fall back to case-insensitive search if exact match fails
-    for filename in os.listdir(models_directory):
-        if filename.lower() == f"{model_name.lower()}.json":
-            return os.path.join(models_directory, filename)
+    # First, try to find an exact (case-sensitive) match
+    for name in filenames:
+        if name == target_exact:
+            found_filename = name
+            break  # Found the best match, no need to look further
+
+    # If no exact match, try a case-insensitive search
+    if not found_filename:
+        for name in filenames:
+            if name.lower() == target_lower:
+                found_filename = name
+                break  # Found a fallback match
+
+    if found_filename:
+        return os.path.join(models_directory, found_filename)
 
     # No matching file found after both attempts
     logger.error(f"No JSON file found for model '{model_name}'")
@@ -85,7 +112,8 @@ def load_json_file(file_path: str) -> Optional[Dict]:
         logger.error(f"Error loading JSON file '{file_path}': {str(e)}")
         return None
 
-def load_model_data(model_name: str, models_directory: str = MODELS_DIR) -> Optional[ModelData]:
+def load_model_data(model_name: str, models_directory: str = MODELS_DIR, 
+                    scoring_config: Optional[ModuleType] = None) -> Optional[ModelData]:
     """Find, load and validate model data from a JSON file.
 
     This function handles the complete process of loading model data:
@@ -97,6 +125,7 @@ def load_model_data(model_name: str, models_directory: str = MODELS_DIR) -> Opti
         model_name (str): Name of the model to load data for
         models_directory (str, optional): Directory containing model JSON files. 
             Defaults to MODELS_DIR constant.
+        scoring_config (ModuleType, optional): A loaded configuration module.
 
     Returns:
         Optional[ModelData]: The loaded and validated model data dictionary if successful,
@@ -119,7 +148,7 @@ def load_model_data(model_name: str, models_directory: str = MODELS_DIR) -> Opti
             return None
 
         # Validate the loaded data structure and contents
-        validate_model_data(data, model_name)
+        validate_model_data(data, model_name, scoring_config=scoring_config)
         
         logger.info(f"Successfully validated data for model '{model_name}'")
         return data
