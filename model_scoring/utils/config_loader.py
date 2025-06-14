@@ -15,10 +15,18 @@
 This module provides utilities for dynamically loading configuration files.
 """
 
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
 import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+
+# ------------------------------------------------------------------------------------------------
+# Functions
+# ------------------------------------------------------------------------------------------------
 
 def load_config_from_path(config_path: str) -> ModuleType:
     """
