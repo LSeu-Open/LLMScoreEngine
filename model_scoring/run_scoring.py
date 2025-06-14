@@ -18,11 +18,23 @@ This module provides the main functionality for scoring models, including
 single-model scoring and batch processing.
 """
 
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
 import os
 import json
 import time
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any
+import sys
+from pathlib import Path
+from types import ModuleType
+
+# Add project root to sys.path for absolute imports.
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from .core.constants import MODELS_DIR, RESULTS_DIR
 from .core.types import ScoringResults, ModelData
@@ -32,13 +44,20 @@ from .utils.logging import configure_console_only_logging
 
 logger = logging.getLogger(__name__)
 
-def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional[ScoringResults]:
+# ------------------------------------------------------------------------------------------------
+# Functions
+# ------------------------------------------------------------------------------------------------
+
+def run_scoring(model_name: str, models_directory: str = MODELS_DIR, 
+                quiet: bool = False, scoring_config: Optional[ModuleType] = None) -> Optional[ScoringResults]:
     """
     Run the scoring process for a given model by loading its JSON from the Models directory.
     
     Args:
         model_name: Name of the model to score
         models_directory: Path to the directory containing model JSONs
+        quiet: If True, suppresses detailed score breakdown output.
+        scoring_config: A loaded configuration module.
     
     Returns:
         Scoring results if successful, None otherwise
@@ -46,74 +65,58 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
     logger.info(f"Starting scoring process for model '{model_name}'")
     
     # Load and validate the model data
-    data = load_model_data(model_name, models_directory)
+    data = load_model_data(model_name, models_directory, scoring_config=scoring_config)
     if not data:
         logger.error(f"Failed to load data for model '{model_name}'")
         return None
 
     try:
-        # Initialize scorer with model name
-        scorer = ModelScorer(model_name)
+        # Initialize scorer with model name and config
+        scorer = ModelScorer(model_name, scoring_config=scoring_config)
         
-        # Extract data from JSON
+        # Extract data sections from the loaded JSON
         entity_benchmarks = data.get('entity_benchmarks', {})
         dev_benchmarks = data.get('dev_benchmarks', {})
-        
-        # Extract community score components
         community_scores_data = data.get('community_score', {})
-        lm_sys_elo = community_scores_data.get('lm_sys_arena_score')
-        hf_val = community_scores_data.get('hf_score')
-        
         model_specs = data.get('model_specs', {})
 
-        # Calculate average benchmark performance
-        available_scores = (
-            [score for score in entity_benchmarks.values() if score is not None] +
-            [score for score in dev_benchmarks.values() if score is not None]
-        )
-        avg_performance = sum(available_scores) / len(available_scores) * 100 if available_scores else 0.0 # Convert to percentage, handle empty list
+        # Calculate average benchmark performance needed for the size/performance ratio
+        all_benchmark_scores = list(entity_benchmarks.values()) + list(dev_benchmarks.values())
+        available_scores = [score for score in all_benchmark_scores if score is not None]
+        avg_performance = (sum(available_scores) / len(available_scores)) * 100 if available_scores else 0.0
 
-        # Calculate scores
-        entity_score = scorer.calculate_entity_benchmarks(entity_benchmarks)
-        dev_score = scorer.calculate_dev_benchmarks(dev_benchmarks)
-        external_score = scorer.calculate_external_benchmarks(entity_benchmarks, dev_benchmarks)
+        # Group inputs for the main scoring function
+        community_inputs = {
+            'lm_sys_arena_elo_rating': community_scores_data.get('lm_sys_arena_score'),
+            'hf_score': community_scores_data.get('hf_score')
+        }
         
-        # Pass the extracted individual scores to the method
-        community_score_val = scorer.calculate_community_score(
-            lm_sys_arena_elo_rating=lm_sys_elo, 
-            hf_score=hf_val
+        tech_inputs = {
+            'price': model_specs.get('price'),
+            'context_window': model_specs.get('context_window'),
+            'benchmark_score': avg_performance, 
+            'param_count': model_specs.get('param_count'),
+            'architecture': model_specs.get('architecture')
+        }
+
+        # Run the entire scoring process with a single method call
+        final_score = scorer.calculate_final_score(
+            entity_benchmarks=entity_benchmarks,
+            dev_benchmarks=dev_benchmarks,
+            community_inputs=community_inputs,
+            tech_inputs=tech_inputs,
+            quiet=quiet
         )
-        
-        # technical_score now internally calls calculate_size_perf_ratio
-        technical_score = scorer.calculate_technical_score(
-            price=model_specs.get('price'),
-            context_window=model_specs.get('context_window'),
-            benchmark_score=avg_performance, 
-            param_count=model_specs.get('param_count'),
-            architecture=model_specs.get('architecture')
-        )
 
-        # Set scores on the scorer instance
-        scorer.external_score = external_score
-        scorer.community_score = community_score_val
-        scorer.technical_score = technical_score
-
-        # Calculate final score
-        final_score = scorer.calculate_final_score()
-
-        # Prepare results dictionary
+        # Prepare results dictionary from the scorer instance attributes
         results: ScoringResults = {
             'model_name': model_name,
             'scores': {
-                'entity_score': entity_score,
-                'dev_score': dev_score,
-                'external_score': external_score,
-                'community_score': community_score_val,
-                'technical_score': technical_score,
+                'entity_score': scorer.entity_score,
+                'dev_score': scorer.dev_score,
+                'community_score': scorer.community_score,
+                'technical_score': scorer.technical_score,
                 'final_score': final_score,
-                'avg_performance': avg_performance,
-                # 'size_perf_ratio': size_perf_ratio # This variable is no longer in the same context
-                # The actual points for this component are now part of technical_score
             },
             'input_data': data
         }
@@ -125,8 +128,20 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR) -> Optional
         logger.error(f"Error during scoring process: {str(e)}")
         return None
 
+def _display_final_score(results: ScoringResults) -> None:
+    """
+    Display the final score in a clean, quiet format.
+
+    Args:
+        results: The scoring results for a model.
+    """
+    model_name = results.get('model_name', 'Unknown Model')
+    final_score = results.get('scores', {}).get('final_score', 'N/A')
+    print(f"{model_name}: {final_score:.4f}")
+
 def batch_process_models(model_names: List[str], models_directory: str = MODELS_DIR, 
-                         results_directory: str = RESULTS_DIR) -> None:
+                         results_directory: str = RESULTS_DIR, quiet: bool = False,
+                         scoring_config: Optional[ModuleType] = None) -> None:
     """
     Process multiple models in batch mode.
     
@@ -134,6 +149,8 @@ def batch_process_models(model_names: List[str], models_directory: str = MODELS_
         model_names: List of model names to process
         models_directory: Directory containing model JSON files
         results_directory: Directory to save results to
+        quiet: Whether to display only final scores
+        scoring_config: A loaded configuration module.
     """
     start_time = time.time()
     
@@ -141,6 +158,7 @@ def batch_process_models(model_names: List[str], models_directory: str = MODELS_
     os.makedirs(results_directory, exist_ok=True)
     
     total_models = len(model_names)
+    all_results = []
     
     # Different header based on number of models
     if total_models == 1:
@@ -160,9 +178,10 @@ def batch_process_models(model_names: List[str], models_directory: str = MODELS_
         logger.info("[>] Starting evaluation...\n")
         
         # Run scoring pipeline for current model
-        results = run_scoring(model_name, models_directory)
+        results = run_scoring(model_name, models_directory, quiet=quiet, scoring_config=scoring_config)
         
         if results:
+            all_results.append(results)
             output_file = os.path.join(results_directory, f"{model_name}_results.json")
             with open(output_file, 'w') as f:
                 json.dump(results, f, indent=4)
@@ -174,6 +193,11 @@ def batch_process_models(model_names: List[str], models_directory: str = MODELS_
     # Calculate elapsed time
     elapsed_time = time.time() - start_time
     
+    if quiet:
+        for res in all_results:
+            _display_final_score(res)
+        return
+        
     # Final summary
     logger.info("=" * 60)
     if total_models == 1:
@@ -182,6 +206,10 @@ def batch_process_models(model_names: List[str], models_directory: str = MODELS_
         logger.info(f"[+] Batch processing completed successfully for all {total_models} models")
     logger.info(f"[*] Total processing time: {elapsed_time:.2f} seconds")
     logger.info("=" * 60 + "\n")
+
+# ------------------------------------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------------------------------------
 
 def main():
     """Main entry point for the scoring system."""
