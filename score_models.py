@@ -109,7 +109,7 @@ def main() -> None:
 
         model_names = []
         if args.all:
-            model_names = [f.split('.')[0] for f in os.listdir('Models') if f.endswith('.json')]
+            model_names = [f.removesuffix('.json') for f in os.listdir('Models') if f.endswith('.json')]
         elif args.models:
             model_names = args.models
         
