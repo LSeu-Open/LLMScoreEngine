@@ -78,7 +78,7 @@ LLMScoreEngine/
 
 **Prerequisites:**
 
-- Python 3.x installed (tested on Python 3.13.1)
+- Python >=3.11 installed
 - [uv](https://github.com/astral-sh/uv) installed (recommended for dependency management)
 
 **Step 1:** Clone the repository:
