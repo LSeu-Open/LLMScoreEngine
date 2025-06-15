@@ -13,8 +13,6 @@
 ![LastCommit](https://img.shields.io/github/last-commit/LSeu-Open/LLMScoreEngine?style=flat)
 ![LastRelease](https://img.shields.io/github/v/release/LSeu-Open/LLMScoreEngine?style=flat)
 
-***Version v0.4.0-beta is currently in development, featuring a broader and significantly more complex approach.***
-
 </div>
 
 <br>
