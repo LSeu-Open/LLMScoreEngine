@@ -34,6 +34,9 @@ Please note that this is a beta version and the scoring system is subject to cha
 
 To help us refine and improve LLMScoreEngine during this beta phase, we actively encourage user feedback, bug reports, and contributions to help us refine and improve LLMScoreEngine. Please feel free to [open an issue](https://github.com/LSeu-Open/LLMScoreEngine/issues) or [contribute](CONTRIBUTING.md) to the project. Make sure to respect the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+> [!NOTE]
+> Following the v0.5.0 update, which introduced modular configuration capabilities, we are now developing a dedicated version of this evaluation system tailored for Vision Language Models (VLMs). This development is ongoing in its [dedicated branch](https://github.com/LSeu-Open/LLMScoreEngine/tree/Vision) within this repository.
+
 ## Project Structure
 
 ```text
