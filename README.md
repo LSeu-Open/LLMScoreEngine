@@ -384,7 +384,7 @@ Results will be stored as JSON files in the `Results` directory, with the follow
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE-CODE.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/LICENSE-CODE.md) file for details.
+This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/LSeu-Open/LLMScoreEngine/blob/main/LICENSE) file for details.
 
 <br>
 
