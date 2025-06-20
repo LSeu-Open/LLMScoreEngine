@@ -27,15 +27,14 @@ import logging
 from types import ModuleType
 import sys
 from pathlib import Path
+from model_scoring.core.constants import REQUIRED_SECTIONS
+from model_scoring.core.exceptions import BenchmarkScoreError, ModelSpecificationError, CommunityScoreError, ModelDataValidationError
+from config import scoring_config as default_scoring_config
 
 # Add project root to sys.path for absolute imports.
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-from model_scoring.core.constants import REQUIRED_SECTIONS
-from model_scoring.core.exceptions import BenchmarkScoreError, ModelSpecificationError, CommunityScoreError, ModelDataValidationError
-from config import scoring_config as default_scoring_config
 
 # ------------------------------------------------------------------------------------------------
 # Validation class and functions
