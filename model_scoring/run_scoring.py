@@ -26,21 +26,20 @@ import os
 import json
 import time
 import logging
-from typing import List, Optional, Any
+from typing import List, Optional
 import sys
 from pathlib import Path
 from types import ModuleType
+from .core.constants import MODELS_DIR, RESULTS_DIR
+from .core.types import ScoringResults
+from .data.loaders import load_model_data
+from .scoring.models_scoring import ModelScorer
+from .utils.logging import configure_console_only_logging
 
 # Add project root to sys.path for absolute imports.
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-from .core.constants import MODELS_DIR, RESULTS_DIR
-from .core.types import ScoringResults, ModelData
-from .data.loaders import load_model_data
-from .scoring.models_scoring import ModelScorer
-from .utils.logging import configure_console_only_logging
 
 logger = logging.getLogger(__name__)
 
