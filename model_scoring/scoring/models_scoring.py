@@ -277,15 +277,38 @@ class ModelScorer:
         Returns:
             float: The final aggregated score, rounded to 4 decimal places.
         """
-        # Calculate scores for all categories
+        # Calculate scores for benchmark categories first
         self.entity_score = self.calculate_entity_benchmarks(entity_benchmarks)
         self.dev_score = self.calculate_dev_benchmarks(dev_benchmarks)
+
+        # Calculate a single, unweighted benchmark performance score (0-100)
+        # to be used in the technical score calculation.
+        all_benchmark_weights = {
+            **self.config.BENCHMARK_WEIGHTS['entity_benchmarks'],
+            **self.config.BENCHMARK_WEIGHTS['dev_benchmarks']
+        }
+        all_benchmark_scores = {**entity_benchmarks, **dev_benchmarks}
+
+        score = 0.0
+        total_weight = 0.0
+        for bench_key, result in all_benchmark_scores.items():
+            if bench_key in all_benchmark_weights and result is not None:
+                score += (result * all_benchmark_weights[bench_key])
+                total_weight += all_benchmark_weights[bench_key]
+
+        overall_benchmark_score = (score / total_weight * 100) if total_weight > 0 else 0.0
+        
+        # Calculate scores for the remaining categories
         self.community_score = self.calculate_community_score(**community_inputs)
-        self.technical_score = self.calculate_technical_score(**tech_inputs)
+        
+        # Pass the overall benchmark score to the technical score calculation
+        tech_inputs_with_benchmark = tech_inputs.copy()
+        tech_inputs_with_benchmark['benchmark_score'] = overall_benchmark_score
+        self.technical_score = self.calculate_technical_score(**tech_inputs_with_benchmark)
         
         # Display the score breakdown
         self._display_score_breakdown(quiet=quiet)
         
         # Aggregate the final score
         final_score = self.entity_score + self.dev_score + self.community_score + self.technical_score
-        return round(final_score, 4) 
+        return round(final_score, 4)
