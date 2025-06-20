@@ -26,16 +26,14 @@ from huggingface_hub import model_info
 from datetime import datetime, timezone
 import math
 import argparse
-
 import sys
 from pathlib import Path
+from config.scoring_config import HUGGING_FACE_SCORE_PARAMS
 
 # Add project root to sys.path for absolute imports, making the script runnable.
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-from config.scoring_config import HUGGING_FACE_SCORE_PARAMS
 
 # ------------------------------------------------------------------------------------------------
 # Hugging Face Community Score Functions
