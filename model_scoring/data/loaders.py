@@ -24,7 +24,7 @@ This module provides functions for loading model data from JSON files.
 import os
 import json
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from types import ModuleType
 
 from ..core.constants import MODELS_DIR
