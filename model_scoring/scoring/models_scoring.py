@@ -24,17 +24,16 @@
 # ------------------------------------------------------------------------------------------------
 
 import math
-from typing import Optional, Any
+from typing import Optional
 import sys
 from pathlib import Path
 from types import ModuleType
+from config import scoring_config as default_scoring_config
 
 # Add project root to sys.path for absolute imports.
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-from config import scoring_config as default_scoring_config
 
 # ------------------------------------------------------------------------------------------------
 # ModelScorer class
@@ -311,4 +310,4 @@ class ModelScorer:
         
         # Aggregate the final score
         final_score = self.entity_score + self.dev_score + self.community_score + self.technical_score
-        return round(final_score, 4)
+        return round(final_score, 4) 
