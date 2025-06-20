@@ -80,11 +80,6 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR,
         community_scores_data = data.get('community_score', {})
         model_specs = data.get('model_specs', {})
 
-        # Calculate average benchmark performance needed for the size/performance ratio
-        all_benchmark_scores = list(entity_benchmarks.values()) + list(dev_benchmarks.values())
-        available_scores = [score for score in all_benchmark_scores if score is not None]
-        avg_performance = (sum(available_scores) / len(available_scores)) * 100 if available_scores else 0.0
-
         # Group inputs for the main scoring function
         community_inputs = {
             'lm_sys_arena_elo_rating': community_scores_data.get('lm_sys_arena_score'),
@@ -94,7 +89,6 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR,
         tech_inputs = {
             'price': model_specs.get('price'),
             'context_window': model_specs.get('context_window'),
-            'benchmark_score': avg_performance, 
             'param_count': model_specs.get('param_count'),
             'architecture': model_specs.get('architecture')
         }
