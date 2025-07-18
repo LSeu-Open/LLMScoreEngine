@@ -1,11 +1,14 @@
 [project]
 name = "LLM-Scoring-Engine"
-version = "0.5.0"
+version = "0.6.0"
 description = "A comprehensive system for evaluating and scoring large language models based on multiple criteria."
 dependencies = [
     "typing_extensions>=4.0.0",
     "argparse>=1.4.0",
-    "huggingface-hub>=0.20.0"
+    "huggingface-hub>=0.20.0",
+    "pandas",
+    "plotly",
+    "Jinja2"
 ]
 requires-python = ">=3.11"
 
