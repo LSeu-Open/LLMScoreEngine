@@ -120,11 +120,18 @@ BENCHMARK_WEIGHTS = types.MappingProxyType({
 # ------------------------------------------------------------------------------------------------
 
 TECHNICAL_SCORE_PARAMS = types.MappingProxyType({
-    'price': types.MappingProxyType({
-        'max_points': 8.0,
-        'coefficient': 0.35,
-        'intercept': 8.0,
+    'input_price': types.MappingProxyType({
+        'max_points': 4.0,
+        'coefficient': 0.15,
+        'intercept': 4.0,
         'high_price_cutoff': 20.0,
+        'high_price_points': 1.0,
+    }),
+    'output_price': types.MappingProxyType({
+        'max_points': 4.0,
+        'coefficient': 0.0375,
+        'intercept': 4.0,
+        'high_price_cutoff': 80.0,
         'high_price_points': 1.0,
     }),
     'context_window': types.MappingProxyType({
