@@ -86,7 +86,8 @@ def run_scoring(model_name: str, models_directory: str = MODELS_DIR,
         }
         
         tech_inputs = {
-            'price': model_specs.get('price'),
+            'input_price': model_specs.get('input_price'),
+            'output_price': model_specs.get('output_price'),
             'context_window': model_specs.get('context_window'),
             'param_count': model_specs.get('param_count'),
             'architecture': model_specs.get('architecture')
