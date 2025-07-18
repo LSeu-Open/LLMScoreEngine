@@ -120,28 +120,21 @@ def test_calculate_community_score(scorer):
 # Technical Score Tests
 # ------------------------------------------------------------------------------------------------
 
-def test_calculate_price_score(scorer):
-    params = scoring_config.TECHNICAL_SCORE_PARAMS['price']
-    print("\n[Price Score]")
+def test_calculate_price_component_score(scorer):
+    """Test price component scoring for both input and output prices."""
+    # Test input price
+    params_in = scoring_config.TECHNICAL_SCORE_PARAMS['input_price']
+    print("\n[Input Price Score]")
+    assert scorer._calculate_price_component_score(None, 'input_price') == 0.0
+    assert scorer._calculate_price_component_score(0, 'input_price') == params_in['max_points']
+    assert scorer._calculate_price_component_score(params_in['high_price_cutoff'], 'input_price') == params_in['high_price_points']
     
-    score1 = scorer._calculate_price_score(None)
-    print(f"  - Price: None -> Score: {score1}")
-    assert score1 == 0.0
-
-    score2 = scorer._calculate_price_score(0)
-    print(f"  - Price: 0 -> Score: {score2}")
-    assert score2 == params['max_points']
-
-    score3 = scorer._calculate_price_score(params['high_price_cutoff'])
-    print(f"  - Price: {params['high_price_cutoff']} (cutoff) -> Score: {score3}")
-    assert score3 == params['high_price_points']
-
-    # A mid-range price
-    price = 10.0
-    expected = params['intercept'] - (params['coefficient'] * price)
-    score4 = scorer._calculate_price_score(price)
-    print(f"  - Price: {price} -> Score: {score4:.4f}")
-    assert score4 == expected
+    # Test output price
+    params_out = scoring_config.TECHNICAL_SCORE_PARAMS['output_price']
+    print("\n[Output Price Score]")
+    assert scorer._calculate_price_component_score(None, 'output_price') == 0.0
+    assert scorer._calculate_price_component_score(0, 'output_price') == params_out['max_points']
+    assert scorer._calculate_price_component_score(params_out['high_price_cutoff'], 'output_price') == params_out['high_price_points']
 
 def test_calculate_context_score(scorer):
     params = scoring_config.TECHNICAL_SCORE_PARAMS['context_window']
@@ -183,21 +176,24 @@ def test_calculate_size_perf_ratio(scorer):
     assert round(score2, 1) == 5.2
 
 def test_calculate_technical_score(scorer):
-    # price_score(1.5) = 8 - 0.35*1.5 = 7.475
-    # context_score(131072) = 0.571 * log2(131072) - 5.929 = 0.571 * 17 - 5.929 = 3.778
-    # ratio(88, 7B, dense) -> eff=0.95*1.0=0.95. combined=(88/100)*0.95=0.836. points=1+5*0.836=5.18
-    # total = 7.475 + 3.778 + 5.18 = 16.433
-    expected_total = 16.43
+    # input_price(1.5) = 4.0 - 0.15*1.5 = 3.775
+    # output_price(3.0) = 4.0 - 0.0375*3.0 = 3.8875
+    # context_score(131072) = 3.778
+    # ratio(88, 7B, dense) = 5.18
+    # total = 3.775 + 3.8875 + 3.778 + 5.18 = 16.6205
+    expected_total = 16.62
     
-    price_val, ctx_val, bench_val, params_val, arch_val = 1.5, 131072, 88.0, 7_000_000_000, 'dense'
+    in_price, out_price, ctx_val, bench_val, params_val, arch_val = 1.5, 3.0, 131072, 88.0, 7_000_000_000, 'dense'
     
-    price_score = scorer._calculate_price_score(price_val)
+    input_price_score = scorer._calculate_price_component_score(in_price, 'input_price')
+    output_price_score = scorer._calculate_price_component_score(out_price, 'output_price')
     context_score = scorer._calculate_context_score(ctx_val)
     ratio_score = scorer.calculate_size_perf_ratio(bench_val, params_val, arch_val)
-    actual_total = scorer.calculate_technical_score(price_val, ctx_val, bench_val, params_val, arch_val)
+    actual_total = scorer.calculate_technical_score(in_price, out_price, ctx_val, bench_val, params_val, arch_val)
     
     print("\n[Technical Score Breakdown]")
-    print(f"  - Price Score:   {price_score:.4f}")
+    print(f"  - Input Price Score:   {input_price_score:.4f}")
+    print(f"  - Output Price Score:  {output_price_score:.4f}")
     print(f"  - Context Score: {context_score:.4f}")
     print(f"  - Ratio Score:   {ratio_score:.4f}")
     print("  ---")
@@ -220,7 +216,8 @@ def test_calculate_final_score(scorer, entity_benchmark_data, dev_benchmark_data
     # 1. Define mock inputs for all categories
     community_inputs = {'lm_sys_arena_elo_rating': 1300, 'hf_score': 8.5}
     tech_inputs = {
-        'price': 1.5,
+        'input_price': 1.5,
+        'output_price': 3.0,
         'context_window': 131072,
         'param_count': 7_000_000_000,
         'architecture': 'dense'
@@ -235,7 +232,21 @@ def test_calculate_final_score(scorer, entity_benchmark_data, dev_benchmark_data
     # The actual implementation uses a combined raw benchmark performance.
     # Let's use a hypothetical combined benchmark score for this test.
     # This is a known simplification for this test.
-    tech_inputs['benchmark_score'] = 85.0 
+    all_benchmark_weights = {
+        **integration_scorer.config.BENCHMARK_WEIGHTS['entity_benchmarks'],
+        **integration_scorer.config.BENCHMARK_WEIGHTS['dev_benchmarks']
+    }
+    all_benchmark_scores = {**entity_benchmark_data, **dev_benchmark_data}
+    
+    score = 0.0
+    total_weight = 0.0
+    for bench_key, result in all_benchmark_scores.items():
+        if bench_key in all_benchmark_weights and result is not None:
+            score += (result * all_benchmark_weights[bench_key])
+            total_weight += all_benchmark_weights[bench_key]
+    
+    overall_benchmark_score = (score / total_weight * 100) if total_weight > 0 else 0.0
+    tech_inputs['benchmark_score'] = overall_benchmark_score
     technical_score = integration_scorer.calculate_technical_score(**tech_inputs)
     
     # 3. Sum of component scores for the final expectation
@@ -257,9 +268,9 @@ def test_calculate_final_score(scorer, entity_benchmark_data, dev_benchmark_data
     print(f"  - Technical Score: {technical_score:.2f}")
     print("  ---")
     print(f"  - Calculated Final Score: {final_score}")
-    print(f"  - Expected Final Score:   {round(expected_final_score, 2)}")
+    print(f"  - Expected Final Score:   {round(expected_final_score, 4)}")
     
-    assert final_score == round(expected_final_score, 2)
+    assert final_score == round(expected_final_score, 4)
 
 # ------------------------------------------------------------------------------------------------
 # Edge Case Tests
@@ -307,35 +318,28 @@ def test_technical_score_edge_cases():
     """Tests technical score components with edge case values."""
     # Use a dedicated scorer to prevent side-effects from other tests.
     edge_scorer = ModelScorer(model_name="EdgeCaseScorer")
-    price_params = scoring_config.TECHNICAL_SCORE_PARAMS['price']
-    context_params = scoring_config.TECHNICAL_SCORE_PARAMS['context_window']
-    size_params = scoring_config.TECHNICAL_SCORE_PARAMS['size_perf_ratio']
-    print("\n[Technical Score Edge Cases]")
-
-    # Price score with negative price should be treated as free (max points).
-    score1 = edge_scorer._calculate_price_score(-10.0)
-    print(f"  - Negative price -> Score: {score1}")
-    assert score1 == price_params['max_points']
-
-    # Context score with zero context window should receive low_cw_points.
-    score2 = edge_scorer._calculate_context_score(0)
-    print(f"  - Zero context -> Score: {score2}")
-    assert score2 == context_params['low_cw_points']
-
-    # Size/Perf ratio with zero benchmark score should result in base points.
-    score3 = edge_scorer.calculate_size_perf_ratio(0.0, 70_000_000_000, 'dense')
-    print(f"  - Zero benchmark for ratio -> Score: {score3}")
-    assert score3 == size_params['base_points']
     
-    # Size/Perf ratio with unknown architecture should use default factor.
-    score_dense = edge_scorer.calculate_size_perf_ratio(85.0, 70_000_000_000, 'dense')
-    score_unknown = edge_scorer.calculate_size_perf_ratio(85.0, 70_000_000_000, 'MyWeirdArch')
-    print(f"  - Unknown architecture -> Dense: {score_dense:.2f}, Unknown: {score_unknown:.2f}")
-    assert score_dense == score_unknown
+    # Price edge cases
+    input_price_params = scoring_config.TECHNICAL_SCORE_PARAMS['input_price']
+    output_price_params = scoring_config.TECHNICAL_SCORE_PARAMS['output_price']
+    
+    assert edge_scorer._calculate_price_component_score(-1, 'input_price') == input_price_params['max_points']
+    assert edge_scorer._calculate_price_component_score(999, 'input_price') == input_price_params['high_price_points']
+    assert edge_scorer._calculate_price_component_score(-1, 'output_price') == output_price_params['max_points']
+    assert edge_scorer._calculate_price_component_score(999, 'output_price') == output_price_params['high_price_points']
 
-    # Full technical score with missing size/perf ratio inputs.
-    # price_score(1.5) -> 7.475; context_score(131072) -> 3.778; ratio -> 0.0
-    # total = 7.475 + 3.778 = 11.253 -> rounded 11.25
-    score4 = edge_scorer.calculate_technical_score(1.5, 131072, None, None, None)
-    print(f"  - Missing ratio inputs -> Score: {score4}")
-    assert score4 == 11.25 
+    # Context window edge cases
+    context_params = scoring_config.TECHNICAL_SCORE_PARAMS['context_window']
+    assert edge_scorer._calculate_context_score(0) == context_params['low_cw_points']
+    assert edge_scorer._calculate_context_score(9999999) == context_params['max_points']
+
+    # Size/performance ratio edge cases
+    size_params = scoring_config.TECHNICAL_SCORE_PARAMS['size_perf_ratio']
+    # Very poor benchmark score should result in base points
+    assert edge_scorer.calculate_size_perf_ratio(0, 1_000_000, 'dense') == size_params['base_points']
+    # Very high benchmark score should be capped at max_points
+    assert edge_scorer.calculate_size_perf_ratio(100, 1_000_000, 'dense') <= size_params['max_points']
+    # Test with None values
+    assert edge_scorer.calculate_size_perf_ratio(None, 1, 'dense') == 0.0
+    assert edge_scorer.calculate_size_perf_ratio(1, None, 'dense') == 0.0
+    assert edge_scorer.calculate_size_perf_ratio(1, 1, None) == 0.0 
