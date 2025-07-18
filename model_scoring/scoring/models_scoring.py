@@ -178,18 +178,22 @@ class ModelScorer:
             
         return round(total_score, 2)
 
-    def _calculate_price_score(self, price: Optional[float]) -> float:
-        """Calculate score based on price, using parameters from config."""
+    def _calculate_price_component_score(self, price: Optional[float], price_type: str) -> float:
+        """Calculate score for a single price component (input or output)."""
         if price is None:
             return 0.0
         
-        params = self.config.TECHNICAL_SCORE_PARAMS['price']
+        params = self.config.TECHNICAL_SCORE_PARAMS[price_type]
         if price <= 0.0:
+            # Free models get max points for this component
             return params['max_points']
         if price >= params['high_price_cutoff']:
             return params['high_price_points']
 
+        # Linear interpolation for score
         raw_score = params['intercept'] - (params['coefficient'] * price)
+        
+        # Ensure score is within defined bounds
         return max(params['high_price_points'], min(params['max_points'], raw_score))
 
     def _calculate_context_score(self, context_size: Optional[int]) -> float:
@@ -231,9 +235,12 @@ class ModelScorer:
         points = size_params['base_points'] + (size_params['scaling_factor'] * combined_score)
         return max(size_params['base_points'], min(size_params['max_points'], points))
 
-    def calculate_technical_score(self, price: Optional[float], context_window: Optional[int], benchmark_score: Optional[float], param_count: Optional[int], architecture: Optional[str]) -> float:
+    def calculate_technical_score(self, input_price: Optional[float], output_price: Optional[float], context_window: Optional[int], benchmark_score: Optional[float], param_count: Optional[int], architecture: Optional[str]) -> float:
         """Calculate technical specifications score."""
-        price_score = self._calculate_price_score(price)
+        input_price_score = self._calculate_price_component_score(input_price, 'input_price')
+        output_price_score = self._calculate_price_component_score(output_price, 'output_price')
+        price_score = input_price_score + output_price_score
+
         context_score = self._calculate_context_score(context_window)
         
         if benchmark_score is not None and param_count is not None and architecture is not None:
