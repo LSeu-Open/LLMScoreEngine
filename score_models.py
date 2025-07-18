@@ -26,7 +26,8 @@ from typing import List
 from model_scoring.run_scoring import batch_process_models
 from model_scoring.utils.logging import configure_console_only_logging
 from model_scoring.utils.config_loader import load_config_from_path
-from model_scoring.csv_reporter import generate_csv_report
+from model_scoring.utils.csv_reporter import generate_csv_report
+from model_scoring.utils.graph_reporter import generate_report as generate_graph_report
 from config import scoring_config as default_scoring_config
 
 # ------------------------------------------------------------------------------------------------
@@ -72,6 +73,12 @@ def parse_args() -> argparse.Namespace:
     )
     
     parser.add_argument(
+        '--graph',
+        action='store_true',
+        help='Generate an HTML graph report from the results.'
+    )
+    
+    parser.add_argument(
         "--version",
         action="version",
         version="%(prog)s Beta v0.5"
@@ -95,6 +102,12 @@ def main() -> None:
         if args.csv:
             generate_csv_report()
             print("[*] CSV report generated successfully.")
+            return
+
+        if args.graph:
+            print("[*] Generating HTML graph report...")
+            generate_graph_report()
+            print("[*] HTML graph report generated successfully.")
             return
 
         # Load scoring configuration
