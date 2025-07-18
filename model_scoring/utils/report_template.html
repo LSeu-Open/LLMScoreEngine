@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self'; 
+        script-src 'self' 'unsafe-inline' https://cdn.plot.ly; 
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+        font-src 'self' https://fonts.gstatic.com;
+        object-src 'none';
+        base-uri 'self';
+    ">
+    <title>Model Performance Report</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" integrity="sha512-vraQS/OZFHuvgZieeDWZXJAEjwG64idiKcBkggAv/rWn9zk3CMMifiy29DoP+kX72GCfo7KiqZdSnEgZB9vGVA==" crossorigin="anonymous">
+    <style>
+        :root {
+            --primary-color: #1976D2; /* Material Blue 700 */
+            --primary-light: #64B5F6; /* Material Blue 300 */
+            --primary-dark: #0D47A1;  /* Material Blue 900 */
+            --text-color: #212121;
+            --secondary-text-color: #757575;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --divider-color: #e0e0e0;
+            --shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            --shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--card-background);
+            border-radius: 8px;
+            box-shadow: var(--shadow-1);
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        }
+        .card:hover {
+            box-shadow: var(--shadow-2);
+        }
+        h1, h2, h3, h4 {
+            font-weight: 500;
+        }
+        h1 {
+            color: var(--primary-dark);
+            font-size: 2.5em;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        h2 {
+            color: var(--primary-color);
+            font-size: 1.8em;
+            padding-bottom: 8px;
+            margin-top: 0;
+        }
+        h3 {
+             color: var(--primary-dark);
+             font-size: 1.4em;
+             margin-top: 24px;
+             margin-bottom: 12px;
+             border-bottom: 1px solid var(--divider-color);
+             padding-bottom: 8px;
+        }
+        .timestamp {
+            font-style: italic;
+            color: var(--secondary-text-color);
+            margin-bottom: 16px;
+        }
+        
+        /* Tab container styles */
+        .tab-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 8px;
+            border-bottom: 2px solid var(--divider-color);
+            margin-bottom: 24px;
+            background: linear-gradient(90deg, rgba(25, 118, 210, 0.05) 0%, rgba(25, 118, 210, 0.02) 100%);
+            border-radius: 8px 8px 0 0;
+            padding: 8px;
+        }
+
+        .tab-container button {
+            background-color: transparent;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 16px 12px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+            color: var(--secondary-text-color);
+            font-weight: 500;
+            border-radius: 6px;
+            position: relative;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tab-container button:hover {
+            background-color: rgba(25, 118, 210, 0.08);
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .tab-container button.active {
+            color: var(--primary-color);
+            background-color: var(--card-background);
+            border-bottom: 3px solid var(--primary-color);
+            box-shadow: 0 -2px 8px rgba(25, 118, 210, 0.15);
+        }
+
+        .tab-container button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 3px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+
+        /* Responsive tab layout */
+        @media (max-width: 1200px) {
+            .tab-container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .tab-container {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+                padding: 6px;
+            }
+            
+            .tab-container button {
+                padding: 12px 8px;
+                font-size: 0.85em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tab-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .tab-container button {
+                padding: 14px 12px;
+                font-size: 0.9em;
+            }
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .toc {
+            list-style-type: none;
+            padding: 0;
+        }
+        .toc li {
+            margin: 12px 0;
+        }
+        .toc a {
+            text-decoration: none;
+            color: var(--primary-color);
+            font-weight: 500;
+            font-size: 1.1em;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+            color: var(--primary-dark);
+        }
+        .summary-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            gap: 20px;
+            padding: 20px 0;
+        }
+        .summary-card {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border-bottom: 4px solid var(--divider-color);
+        }
+        .side-card {
+            flex: 1;
+        }
+        .center-card {
+            flex: 1.5;
+            padding: 30px;
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+            box-shadow: var(--shadow-2);
+        }
+        .summary-card h4 {
+            margin: 0 0 12px 0;
+            color: var(--secondary-text-color);
+            font-size: 1em;
+            font-weight: 400;
+        }
+        .summary-card p {
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 500;
+            color: var(--primary-dark);
+        }
+        .center-card p {
+            font-size: 2em;
+        }
+
+        /* Table styles */
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--divider-color);
+            vertical-align: middle;
+            word-wrap: break-word;
+        }
+        .leaderboard-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .leaderboard-table .col-model_name {
+            text-align: left;
+            font-weight: 500;
+        }
+        .leaderboard-table th {
+            font-weight: 700;
+            color: var(--secondary-text-color);
+            background-color: transparent;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid var(--divider-color);
+            cursor: pointer;
+            position: relative;
+        }
+        .leaderboard-table th:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+        .leaderboard-table th .sort-icon {
+            margin-left: 8px;
+            position: relative;
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            top: -1px;
+        }
+        .sort-icon::before,
+        .sort-icon::after {
+            content: "";
+            display: block;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            transition: all 0.2s ease-in-out;
+        }
+        .sort-icon::before { /* Up arrow */
+            top: 2px;
+            border-bottom: 5px solid var(--secondary-text-color);
+            opacity: 0.3;
+        }
+        .sort-icon::after { /* Down arrow */
+            bottom: 2px;
+            border-top: 5px solid var(--secondary-text-color);
+            opacity: 0.3;
+        }
+        .leaderboard-table th.sorted-asc .sort-icon::before {
+            border-bottom-color: var(--primary-color);
+            opacity: 1;
+        }
+        .leaderboard-table th.sorted-desc .sort-icon::after {
+            border-top-color: var(--primary-color);
+            opacity: 1;
+        }
+        .leaderboard-table th.sorted-asc .sort-icon,
+        .leaderboard-table th.sorted-desc .sort-icon {
+            opacity: 1;
+        }
+        .leaderboard-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .leaderboard-table tr:nth-child(even) {
+            background-color: transparent;
+        }
+        .leaderboard-table tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+        .leaderboard-table .col-final_score {
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        .leaderboard-table td:not(.col-model_name),
+        .leaderboard-table th:not(.col-model_name) {
+            text-align: center;
+        }
+
+        .leaderboard-table th.col-model_name {
+            text-align: left;
+        }
+
+        /* Column Toggle Styles */
+        .column-toggle-container {
+            text-align: left;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .column-toggle-btn-wrapper {
+            position: relative;
+        }
+        .column-toggle-btn {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .column-toggle-dropdown {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 4px;
+            padding: 8px 0;
+        }
+        .column-toggle-dropdown label {
+            display: block;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+        .column-toggle-dropdown label:hover {
+            background-color: #f1f1f1;
+        }
+        #modelSearchInput {
+            padding: 8px 12px;
+            border: 1px solid var(--divider-color);
+            border-radius: 4px;
+            font-size: 1em;
+            flex-grow: 1; /* Allow the search box to take up remaining space */
+        }
+        .arch-filter-container {
+            display: flex;
+            background-color: #e9ecef;
+            border-radius: 6px;
+            padding: 4px;
+        }
+        .arch-filter-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: transparent;
+            color: var(--secondary-text-color);
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
+        .arch-filter-btn.active {
+            background-color: white;
+            color: var(--primary-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .leaderboard-summary {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--divider-color);
+        }
+        .summary-item {
+            text-align: left;
+        }
+        .summary-value {
+            font-size: 2em;
+            font-weight: 500;
+            color: var(--primary-dark);
+            display: block;
+        }
+        .summary-label {
+            font-size: 0.9em;
+            color: var(--secondary-text-color);
+        }
+        /* Parameter Filter Button Styles */
+        .param-filter-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .param-filter-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--divider-color);
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: transparent;
+            color: var(--secondary-text-color);
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
+        .param-filter-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        .param-filter-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        /* Range Slider Styles */
+        .range-slider-container {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .range-slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .range-slider-header label {
+            font-weight: 500;
+            color: var(--secondary-text-color);
+            margin: 0;
+        }
+        .range-slider-values {
+            font-weight: 500;
+            color: var(--primary-dark);
+        }
+        .slider-wrapper {
+            position: relative;
+            height: 20px;
+        }
+        .slider-track, .slider-highlight {
+            position: absolute;
+            height: 6px;
+            border-radius: 3px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+        }
+        .slider-track {
+            background-color: var(--divider-color);
+            z-index: 1;
+        }
+        .slider-highlight {
+            background-color: var(--primary-light);
+            z-index: 2;
+        }
+        .slider-wrapper input[type=range] {
+            position: absolute;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 20px; /* Full height for thumb interaction */
+            background: transparent;
+            pointer-events: none; /* Interact with thumbs only */
+            z-index: 3;
+            margin: 0;
+        }
+        .slider-wrapper input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--primary-color);
+            cursor: pointer;
+            border-radius: 50%;
+            pointer-events: auto; /* Allow thumb interaction */
+        }
+        /* Header styles */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 32px 24px;
+            margin: -24px -24px 24px -24px;
+            border-radius: 0 0 16px 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.5em;
+            font-weight: 300;
+            margin: 0 0 8px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            animation: slideInFromTop 0.8s ease-out;
+            text-align: center;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1em;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-bottom: 20px;
+            animation: slideInFromTop 0.8s ease-out 0.2s both;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-subtitle a {
+            color: rgba(255, 255, 255, 0.95);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 2px 6px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        
+        .header-subtitle a:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            animation: slideInFromTop 0.8s ease-out 0.4s both;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .stat-item {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        
+        .stat-item.highlight {
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            opacity: 1;
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .stat-item:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            opacity: 1;
+        }
+        
+        .stat-item.highlight:hover {
+            transform: scale(1.05) translateY(-2px);
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .stat-item.highlight .stat-value {
+            font-size: 2.2em;
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .timestamp {
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 16px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .timestamp::before {
+            content: '⏱️';
+            font-size: 1.1em;
+        }
+        
+        /* Animations */
+        @keyframes slideInFromTop {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Responsive header */
+        @media (max-width: 768px) {
+            .header {
+                padding: 24px 16px;
+            }
+            
+            .header h1 {
+                font-size: 2.2em;
+            }
+            
+            .header-subtitle {
+                font-size: 1em;
+                padding: 14px 16px;
+                margin-bottom: 16px;
+            }
+            
+            .header-subtitle a {
+                padding: 3px 8px;
+                font-size: 0.95em;
+            }
+            
+            .header-stats {
+                gap: 12px;
+                flex-direction: column;
+            }
+            
+            .stat-item {
+                padding: 10px 14px;
+                width: 100%;
+                text-align: center;
+            }
+            
+            .stat-value {
+                font-size: 1.6em;
+            }
+            
+            .stat-item.highlight .stat-value {
+                font-size: 1.9em;
+            }
+        }
+        /* Model Comparison Section */
+        .comparison-container {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .model-selector {
+            flex: 1;
+            min-width: 250px;
+            max-width: 300px;
+            background-color: var(--card-background);
+            padding: 16px;
+            border-radius: 8px;
+            align-self: flex-start;
+            border: 1px solid var(--divider-color);
+            box-shadow: var(--shadow-1);
+        }
+
+        .selector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .selector-header h4 {
+            margin: 0;
+            color: var(--primary-dark);
+            font-size: 1.1em;
+        }
+
+        .reset-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5em;
+            opacity: 0.6;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+
+        .reset-btn:hover {
+            opacity: 1;
+            transform: rotate(180deg);
+        }
+
+        .model-selector h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: var(--primary-dark);
+            font-size: 1.1em;
+        }
+
+        .model-checkbox-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .model-checkbox-list label {
+            display: block;
+            margin-bottom: 8px;
+            cursor: pointer;
+            padding: 10px 14px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .model-checkbox-list label:hover {
+            background-color: rgba(25, 118, 210, 0.08);
+            transform: translateX(4px);
+        }
+
+        .model-checkbox-list input[type="checkbox"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background-color: #fff;
+            margin-right: 12px;
+            font: inherit;
+            color: currentColor;
+            width: 1.2em;
+            height: 1.2em;
+            border: 0.15em solid currentColor;
+            border-radius: 0.3em;
+            transform: translateY(-0.075em);
+            display: grid;
+            place-content: center;
+            opacity: 0.5;
+            transition: all 0.1s ease-in-out;
+        }
+
+        .model-checkbox-list input[type="checkbox"]::before {
+            content: "";
+            width: 0.7em;
+            height: 0.7em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em var(--primary-color);
+            transform-origin: bottom left;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        .model-checkbox-list input[type="checkbox"]:checked {
+            opacity: 1;
+            border-color: var(--primary-color);
+        }
+        
+        .model-checkbox-list input[type="checkbox"]:checked::before {
+            transform: scale(1);
+        }
+        
+        .model-checkbox-list input[type="checkbox"]:hover {
+            opacity: 1;
+        }
+        
+        .chart-display-container {
+            flex: 3;
+            min-width: 400px;
+        }
+        
+        .view-switcher {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            align-self: flex-start;
+        }
+        
+        .view-toggle-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--divider-color);
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: transparent;
+            color: var(--secondary-text-color);
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .view-toggle-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .view-toggle-btn.active {
+            background-color: var(--primary-light);
+            color: white;
+            border-color: var(--primary-light);
+        }
+        
+        .chart-view {
+            display: none;
+        }
+        
+        .chart-view.active {
+            display: block;
+        }
+        
+        .radar-chart {
+            flex: 3;
+            min-width: 400px;
+        }
+
+        .chart-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 20px;
+            padding: 16px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .chart-control-explanation {
+            font-size: 0.9em;
+            color: var(--secondary-text-color);
+            margin: -10px 0 10px 15px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .control-group strong {
+            font-weight: 500;
+            color: var(--secondary-text-color);
+        }
+
+        /* Toggle Switch for Difference Mode */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .switch input { display: none; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        #baselineModelSelector {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--divider-color);
+        }
+
+        .category-toggles label {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .category-toggles input {
+             margin-right: 6px;
+        }
+
+        @media (max-width: 900px) {
+            .comparison-container {
+                flex-direction: column;
+            }
+
+            .model-selector {
+                max-width: 100%;
+                max-height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <h1>{{ report_title }}</h1>
+                <p class="header-subtitle">{{ intro_text }}</p>
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ leaderboard_data | length }}</div>
+                        <div class="stat-label">Total Models</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ summary_data.top_model_by_cost }}</div>
+                        <div class="stat-label">Best Cost-Efficiency</div>
+                    </div>
+                    <div class="stat-item highlight">
+                        <div class="stat-value">{{ summary_data.top_model_by_score }}</div>
+                        <div class="stat-label">Highest Overall Score</div>
+                    </div>
+                </div>
+                <p class="timestamp">Generated on: {{ timestamp }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="tab-container">
+                <button class="tab-links active" onclick="openTab(event, 'leaderboard')">Leaderboard</button>
+                <button class="tab-links" onclick="openTab(event, 'param_vs_perf')">Performance vs. Parameters</button>
+                <button class="tab-links" onclick="openTab(event, 'score_composition')">Score Composition</button>
+                <button class="tab-links" onclick="openTab(event, 'avg_score_composition')">Average Score Composition</button>
+                {% if fig_cost %}
+                    <button class="tab-links" onclick="openTab(event, 'cost_analysis')">Cost Analysis</button>
+                    <button class="tab-links" onclick="openTab(event, 'cost_efficiency')">Cost Efficiency</button>
+                {% endif %}
+                <button class="tab-links" onclick="openTab(event, 'arch_dist')">Architecture Distribution</button>
+                <button class="tab-links" onclick="openTab(event, 'model_comparison')">Model Comparison</button>
+            </div>
+
+            <div id="leaderboard" class="tab-content active">
+                <h2>Leaderboard</h2>
+
+                <div class="leaderboard-summary">
+                    <div class="summary-item">
+                        <span class="summary-value">{{ leaderboard_data | length }}</span>
+                        <span class="summary-label">Total Models</span>
+                    </div>
+                    <div class="summary-item">
+                        <span id="displayedModelsCount" class="summary-value">0</span>
+                        <span class="summary-label">Displayed Models</span>
+                    </div>
+                </div>
+
+                <div class="column-toggle-container">
+                    <div class="column-toggle-btn-wrapper">
+                        <button id="columnToggleBtn" class="column-toggle-btn">Toggle Columns</button>
+                        <div id="columnToggleDropdown" class="column-toggle-dropdown">
+                            {% for header in leaderboard_headers %}
+                            <label>
+                                <input type="checkbox" class="column-toggle-checkbox" data-col-name="{{ header }}" checked>
+                                {{ header | replace('_', ' ') | title }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="arch-filter-container">
+                        <button class="arch-filter-btn active" data-filter="all">All</button>
+                        <button class="arch-filter-btn" data-filter="dense">Dense</button>
+                        <button class="arch-filter-btn" data-filter="moe">MOE</button>
+                    </div>
+                    <input type="search" id="modelSearchInput" placeholder="Search for models...">
+                </div>
+                
+                <div class="range-slider-container">
+                    <div class="range-slider-header">
+                        <label>Filter by Parameter Count (Billions):</label>
+                        <div class="range-slider-values">
+                            <span id="minParamValue">{{ min_param }}</span>B - <span id="maxParamValue">{{ max_param }}</span>B
+                        </div>
+                    </div>
+                    <div class="param-filter-container">
+                        <button class="param-filter-btn active" data-min="{{min_param}}" data-max="{{max_param}}">All</button>
+                        <button class="param-filter-btn" data-min="0" data-max="7">&lt; 7B</button>
+                        <button class="param-filter-btn" data-min="7" data-max="15">7-15B</button>
+                        <button class="param-filter-btn" data-min="15" data-max="70">15-70B</button>
+                        <button class="param-filter-btn" data-min="70" data-max="{{max_param}}">&gt; 70B</button>
+                    </div>
+                    <div class="slider-wrapper">
+                        <div class="slider-track"></div>
+                        <div class="slider-highlight"></div>
+                        <input type="range" id="minParam" min="{{min_param}}" max="{{max_param}}" value="{{min_param}}">
+                        <input type="range" id="maxParam" min="{{min_param}}" max="{{max_param}}" value="{{max_param}}">
+                    </div>
+                </div>
+
+                <table class="leaderboard-table" id="leaderboardTable" 
+                       data-default-sort-col="{{ final_score_col_index }}"
+                       data-default-visible-cols='{{ default_visible_cols | tojson | safe }}'>
+                    <thead>
+                        <tr>
+                            {% for header in leaderboard_headers %}
+                                <th data-col-index="{{ loop.index0 }}"
+                                    class="col-{{ header }}">
+                                    {{ header | replace('_', ' ') | title }} <span class="sort-icon"></span>
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in leaderboard_data %}
+                        <tr>
+                            {% for header in leaderboard_headers %}
+                                <td class="col-{{ header }}">
+                                    {% if header == 'final_score' and row[header] %}
+                                        {{ '%.2f' | format(row[header] | float) }}
+                                    {% else %}
+                                        {{ row[header] }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="param_vs_perf" class="tab-content">
+                <h2>Performance vs. Parameter Count</h2>
+                {{ fig_scatter_html | safe }}
+            </div>
+
+            <div id="score_composition" class="tab-content">
+                <h2>Score Composition by Parameter Count</h2>
+                {{ fig_bar_faceted_html | safe }}
+            </div>
+
+            <div id="avg_score_composition" class="tab-content">
+                <h2>Average Score Composition by Parameter Count</h2>
+                {{ fig_pie_composition_html | safe }}
+            </div>
+            
+            {% if fig_cost %}
+                <div id="cost_analysis" class="tab-content">
+                    <h2>Performance vs. Cost Analysis</h2>
+                    {{ fig_cost_html | safe }}
+                </div>
+                <div id="cost_efficiency" class="tab-content">
+                    <h2>Cost-Efficiency Leaderboard</h2>
+                    <p>This leaderboard ranks models by their cost-efficiency, calculated as <strong>Final Score / Total Price (Input + Output USD/Mtok)</strong>. Higher values are better.</p>
+                    {% if cost_efficiency_data %}
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Model Name</th>
+                                    <th>Cost-Efficiency Score</th>
+                                    <th>Final Score</th>
+                                    <th>Input Price (USD/Mtok)</th>
+                                    <th>Output Price (USD/Mtok)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for model in cost_efficiency_data %}
+                                <tr>
+                                    <td>{{ model.model_name }}</td>
+                                    <td><strong>{{ model.cost_efficiency }}</strong></td>
+                                    <td>{{ '%.2f' | format(model.final_score | float) }}</td>
+                                    <td>${{ '%.2f' | format(model.input_price | float) }}</td>
+                                    <td>${{ '%.2f' | format(model.output_price | float) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No models with price data available to calculate cost-efficiency.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div id="arch_dist" class="tab-content">
+                <h2>Final Score Distribution by Architecture</h2>
+                {{ fig_violin_html | safe }}
+            </div>
+
+            <div id="model_comparison" class="tab-content">
+                <h2>Model Comparison</h2>
+                <div id="radarData" data-models='{{ radar_chart_data | tojson | safe }}' style="display: none;"></div>
+                <div class="comparison-container">
+                    <div class="model-selector">
+                        <div class="selector-header">
+                            <h4>Select Models to Compare (Max 5)</h4>
+                            <button id="resetRadarBtn" class="reset-btn" title="Reset to default">🔄</button>
+                        </div>
+                        <div id="radarModelSelector" class="model-checkbox-list">
+                            {% for row in radar_chart_data %}
+                            <label>
+                                <input type="checkbox" class="radar-checkbox" value="{{ row.model_name }}" 
+                                       {% if loop.index <= 2 %}checked{% endif %}>
+                                {{ row.model_name }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="chart-display-container">
+                        <div class="view-switcher">
+                            <button class="view-toggle-btn" data-view="radar">Radar View</button>
+                            <button class="view-toggle-btn active" data-view="bar">Bar View</button>
+                        </div>
+                        <div id="radarView" class="chart-view">
+                            <div id="radarChartContainer" class="radar-chart">
+                                {{ fig_radar_html | safe }}
+                            </div>
+                        </div>
+                        <div id="barView" class="chart-view active">
+                            <div id="barChartContainer" class="radar-chart">
+                                <!-- Bar chart will be rendered here by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-controls">
+                    <div class="control-group">
+                        <label class="switch" title="Toggle between absolute scores and score differences relative to a baseline. When enabled, it subtracts a selected baseline model's scores from other selected models to highlight their relative strengths and weaknesses.">
+                            <input type="checkbox" id="differenceModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                        <strong>Difference Mode</strong>
+                        <select id="baselineModelSelector" style="display: none;"></select>
+                    </div>
+                    <div class="control-group category-toggles">
+                        <strong>Toggle Categories:</strong>
+                        <label><input type="checkbox" class="category-checkbox" value="entity_score" checked> Entity</label>
+                        <label><input type="checkbox" class="category-checkbox" value="dev_score" checked> Dev</label>
+                        <label><input type="checkbox" class="category-checkbox" value="community_score" checked> Community</label>
+                        <label><input type="checkbox" class="category-checkbox" value="technical_score" checked> Technical</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        
+        // Hide all tab content
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+            tabcontent[i].classList.remove("active");
+        }
+        
+        // Remove active class from all tab links
+        tablinks = document.getElementsByClassName("tab-links");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        
+        // Show the current tab and add an "active" class to the button that opened the tab
+        var activeTab = document.getElementById(tabName);
+        activeTab.style.display = "block";
+        activeTab.classList.add("active");
+        evt.currentTarget.className += " active";
+
+        // Resize Plotly charts
+        var plotlyGraphs = activeTab.querySelectorAll('.js-plotly-plot');
+        if (plotlyGraphs.length > 0) {
+            for (var j = 0; j < plotlyGraphs.length; j++) {
+                setTimeout(function(graph) {
+                    Plotly.Plots.resize(graph);
+                }, 10, plotlyGraphs[j]);
+            }
+        }
+    }
+
+    // Set default tab to be open on page load
+    document.addEventListener("DOMContentLoaded", function() {
+        // Click the first tab link to open it
+        document.getElementsByClassName("tab-links")[0].click();
+        
+        const leaderboardTable = document.getElementById("leaderboardTable");
+        if (leaderboardTable) {
+            // Default sort on page load
+            const defaultSortCol = leaderboardTable.dataset.defaultSortCol;
+            if (defaultSortCol && defaultSortCol !== '-1') {
+                sortTable(parseInt(defaultSortCol, 10), 'desc');
+            }
+        }
+
+        // Column toggling logic
+        const columnToggleBtn = document.getElementById('columnToggleBtn');
+        const columnToggleDropdown = document.getElementById('columnToggleDropdown');
+        const checkboxes = document.querySelectorAll('.column-toggle-checkbox');
+
+        columnToggleBtn.addEventListener('click', (event) => {
+            columnToggleDropdown.style.display = columnToggleDropdown.style.display === 'block' ? 'none' : 'block';
+            event.stopPropagation();
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!columnToggleBtn.contains(event.target) && !columnToggleDropdown.contains(event.target)) {
+                columnToggleDropdown.style.display = 'none';
+            }
+        });
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                toggleColumnVisibility();
+            });
+        });
+
+        function setDefaultColumns() {
+            const leaderboardTable = document.getElementById('leaderboardTable');
+            const defaultVisibleJSON = leaderboardTable.dataset.defaultVisibleCols;
+            const defaultVisible = JSON.parse(defaultVisibleJSON || '[]');
+
+            checkboxes.forEach(checkbox => {
+                const colName = checkbox.dataset.colName;
+                checkbox.checked = defaultVisible.includes(colName);
+            });
+            toggleColumnVisibility();
+        }
+
+        function toggleColumnVisibility() {
+            checkboxes.forEach((checkbox, index) => {
+                const isChecked = checkbox.checked;
+                const cells = document.querySelectorAll(`#leaderboardTable th:nth-child(${index + 1}), #leaderboardTable td:nth-child(${index + 1})`);
+                cells.forEach(cell => {
+                    cell.style.display = isChecked ? '' : 'none';
+                });
+            });
+        }
+        
+        setDefaultColumns();
+
+        // Add event listeners for table sorting after DOM is loaded
+        const tableHeader = document.querySelector("#leaderboardTable thead");
+        if (tableHeader) {
+            tableHeader.addEventListener('click', function(event) {
+                const headerCell = event.target.closest('th');
+                if (headerCell && headerCell.dataset.colIndex) {
+                    sortTable(parseInt(headerCell.dataset.colIndex, 10));
+                }
+            });
+        }
+
+        // Search logic with debouncing
+        const searchInput = document.getElementById('modelSearchInput');
+        let searchTimeout;
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                // Clear the previous timeout if user is still typing
+                clearTimeout(searchTimeout);
+                
+                // Set a new timeout to run filterTable after 300ms of inactivity
+                searchTimeout = setTimeout(() => {
+                    filterTable();
+                }, 300);
+            });
+        }
+
+        // Arch filter logic
+        const archFilterContainer = document.querySelector('.arch-filter-container');
+        if (archFilterContainer) {
+            archFilterContainer.addEventListener('click', (event) => {
+                if (event.target.classList.contains('arch-filter-btn')) {
+                    archFilterContainer.querySelector('.active').classList.remove('active');
+                    event.target.classList.add('active');
+                    filterTable();
+                }
+            });
+        }
+        
+        // Parameter preset filter logic
+        const paramFilterContainer = document.querySelector('.param-filter-container');
+        const minParamSlider = document.getElementById('minParam');
+        const maxParamSlider = document.getElementById('maxParam');
+        
+        if (paramFilterContainer) {
+            paramFilterContainer.addEventListener('click', (event) => {
+                if (event.target.classList.contains('param-filter-btn')) {
+                    const button = event.target;
+                    const min = button.dataset.min;
+                    const max = button.dataset.max;
+                    
+                    minParamSlider.value = min;
+                    maxParamSlider.value = max;
+                    
+                    // Update active state
+                    paramFilterContainer.querySelector('.active')?.classList.remove('active');
+                    button.classList.add('active');
+                    
+                    // Trigger updates
+                    updateSliderAppearance();
+                    filterTable();
+                }
+            });
+        }
+
+        // Range slider logic
+        const minParamValue = document.getElementById('minParamValue');
+        const maxParamValue = document.getElementById('maxParamValue');
+        const sliderHighlight = document.querySelector('.slider-highlight');
+
+        function updateSliderAppearance() {
+            if (!minParamSlider || !maxParamSlider || !sliderHighlight) return;
+
+            const minVal = parseInt(minParamSlider.value);
+            const maxVal = parseInt(maxParamSlider.value);
+            const minBound = parseInt(minParamSlider.min);
+            const maxBound = parseInt(minParamSlider.max);
+            
+            // Update text values
+            minParamValue.textContent = minVal;
+            maxParamValue.textContent = maxVal;
+
+            // Update highlight bar
+            const range = maxBound - minBound;
+            const minPercent = ((minVal - minBound) / range) * 100;
+            const maxPercent = ((maxVal - minBound) / range) * 100;
+            sliderHighlight.style.left = `${minPercent}%`;
+            sliderHighlight.style.width = `${maxPercent - minPercent}%`;
+        }
+
+        function setupRangeSlider() {
+            if (!minParamSlider || !maxParamSlider) return;
+
+            minParamSlider.addEventListener('input', () => {
+                if (parseInt(minParamSlider.value) > parseInt(maxParamSlider.value)) {
+                    maxParamSlider.value = minParamSlider.value;
+                }
+                paramFilterContainer.querySelector('.active')?.classList.remove('active');
+                updateSliderAppearance();
+                filterTable();
+            });
+
+            maxParamSlider.addEventListener('input', () => {
+                if (parseInt(maxParamSlider.value) < parseInt(minParamSlider.value)) {
+                    minParamSlider.value = maxParamSlider.value;
+                }
+                paramFilterContainer.querySelector('.active')?.classList.remove('active');
+                updateSliderAppearance();
+                filterTable();
+            });
+
+            // Initial update
+            updateSliderAppearance();
+        }
+        setupRangeSlider();
+
+        // Initial setup on page load
+        setDefaultColumns();
+        filterTable(); // Also runs initial model count
+
+        // Radar chart logic
+        const radarModelSelector = document.getElementById('radarModelSelector');
+        
+        function resetRadarToDefault() {
+            const checkboxes = radarModelSelector.querySelectorAll('.radar-checkbox');
+            checkboxes.forEach((checkbox, index) => {
+                checkbox.checked = (index < 2);
+            });
+            updateComparisonCharts();
+        }
+
+        if (radarModelSelector) {
+            const checkboxes = radarModelSelector.querySelectorAll('.radar-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    let selectedModels = Array.from(checkboxes)
+                                             .filter(i => i.checked)
+                                             .map(i => i.value);
+                    
+                    if (selectedModels.length > 5) {
+                        alert("You can select a maximum of 5 models for comparison.");
+                        checkbox.checked = false;
+                        return;
+                    }
+                    
+                    updateComparisonCharts();
+                });
+            });
+
+            const resetRadarBtn = document.getElementById('resetRadarBtn');
+            if (resetRadarBtn) {
+                resetRadarBtn.addEventListener('click', resetRadarToDefault);
+            }
+        }
+
+        // Event listeners for comparison chart controls
+        document.getElementById('differenceModeToggle').addEventListener('change', () => updateComparisonCharts());
+        document.getElementById('baselineModelSelector').addEventListener('change', () => updateComparisonCharts());
+        document.querySelectorAll('.category-checkbox').forEach(cb => {
+            cb.addEventListener('change', () => updateComparisonCharts());
+        });
+
+        // View Switcher Logic
+        document.querySelectorAll('.view-toggle-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelector('.view-toggle-btn.active').classList.remove('active');
+                button.classList.add('active');
+
+                document.querySelector('.chart-view.active').classList.remove('active');
+                document.getElementById(button.dataset.view + 'View').classList.add('active');
+                
+                updateComparisonCharts();
+            });
+        });
+
+        // Highlight on Hover Logic for Radar Chart
+        const radarChartContainer = document.getElementById('radarChartContainer');
+        if (radarChartContainer && radarChartContainer.on) {
+            radarChartContainer.on('plotly_hover', function(data) {
+                const curveNumber = data.points[0].curveNumber;
+                const traceCount = radarChartContainer.data.length;
+                const opacities = Array(traceCount).fill(0.3);
+                opacities[curveNumber] = 1;
+                
+                Plotly.restyle(radarChartContainer, {opacity: opacities});
+            }).on('plotly_unhover', function(data) {
+                Plotly.restyle(radarChartContainer, {opacity: 1});
+            });
+        }
+
+        // Initialize the default comparison chart on page load
+        updateComparisonCharts();
+    });
+
+    function updateDisplayedModelCount() {
+        const table = document.getElementById('leaderboardTable');
+        if (!table) return;
+        const rows = table.tBodies[0].rows;
+        let visibleRows = 0;
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].style.display !== 'none') {
+                visibleRows++;
+            }
+        }
+        document.getElementById('displayedModelsCount').textContent = visibleRows;
+    }
+
+    function filterTable() {
+        const searchTerm = document.getElementById('modelSearchInput').value.toLowerCase();
+        const minParam = parseInt(document.getElementById('minParam').value, 10);
+        const maxParam = parseInt(document.getElementById('maxParam').value, 10);
+        const archFilter = document.querySelector('.arch-filter-btn.active').dataset.filter;
+
+        const table = document.getElementById('leaderboardTable');
+        const rows = table.tBodies[0].rows;
+        const headers = Array.from(table.tHead.rows[0].cells);
+        const modelNameColIndex = headers.findIndex(header => header.textContent.trim().toLowerCase() === 'model name');
+        const paramCountColIndex = headers.findIndex(header => header.textContent.trim().toLowerCase() === 'param count');
+        const archColIndex = headers.findIndex(header => header.textContent.trim().toLowerCase() === 'architecture');
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            let isVisible = true;
+
+            // Filter by search term
+            if (modelNameColIndex !== -1) {
+                const modelNameCell = row.cells[modelNameColIndex];
+                const modelName = modelNameCell.textContent.toLowerCase();
+                if (modelName.indexOf(searchTerm) === -1) {
+                    isVisible = false;
+                }
+            }
+
+            // Filter by parameter count
+            if (isVisible && paramCountColIndex !== -1) {
+                const paramCountCell = row.cells[paramCountColIndex];
+                const paramCount = parseFloat(paramCountCell.textContent);
+                if (isNaN(paramCount) || paramCount < minParam || paramCount > maxParam) {
+                    isVisible = false;
+                }
+            }
+            
+            // Filter by architecture
+            if (isVisible && archFilter !== 'all' && archColIndex !== -1) {
+                const archCell = row.cells[archColIndex];
+                const arch = archCell.textContent.toLowerCase().trim();
+                if (arch !== archFilter) {
+                    isVisible = false;
+                }
+            }
+
+            row.style.display = isVisible ? "" : "none";
+        }
+        
+        updateDisplayedModelCount();
+    }
+
+    function sortTable(colIndex, forceDirection = null) {
+        const table = document.getElementById("leaderboardTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.rows);
+        const header = table.tHead.rows[0].cells[colIndex];
+
+        // Determine sort direction
+        const currentIsAsc = header.classList.contains('sorted-asc');
+        const direction = forceDirection ? forceDirection : (currentIsAsc ? 'desc' : 'asc');
+
+        // Sort rows
+        rows.sort((a, b) => {
+            const aText = a.cells[colIndex].textContent.trim();
+            const bText = b.cells[colIndex].textContent.trim();
+            
+            const aNum = parseFloat(aText);
+            const bNum = parseFloat(bText);
+
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return direction === 'asc' ? aNum - bNum : bNum - aNum;
+            } else {
+                return direction === 'asc' ? aText.localeCompare(bText) : bText.localeCompare(aText);
+            }
+        });
+
+        // Re-append sorted rows
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Update header styles
+        Array.from(table.tHead.rows[0].cells).forEach(th => {
+            th.classList.remove('sorted-asc', 'sorted-desc');
+        });
+        
+        header.classList.add(direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    }
+
+    function updateComparisonCharts() {
+        const activeView = document.querySelector('.view-toggle-btn.active').dataset.view;
+        const selectedModels = Array.from(document.querySelectorAll('.radar-checkbox:checked')).map(cb => cb.value);
+
+        if (activeView === 'radar') {
+            updateRadarChart(selectedModels);
+        } else {
+            updateBarChart(selectedModels);
+        }
+    }
+
+    function updateRadarChart(selectedModels) {
+        const radarDataElement = document.getElementById('radarData');
+        const radarData = JSON.parse(radarDataElement.dataset.models);
+        
+        const isDifferenceMode = document.getElementById('differenceModeToggle').checked;
+        const baselineModelSelector = document.getElementById('baselineModelSelector');
+        
+        const visibleCategories = Array.from(document.querySelectorAll('.category-checkbox:checked')).map(cb => cb.value);
+
+        if (visibleCategories.length === 0) {
+            Plotly.newPlot(document.getElementById('radarChartContainer'), [], {title: 'Please select at least one category.'});
+            return;
+        }
+
+        let traces = [];
+        let layout;
+        let minVal = 0, maxVal = 0;
+
+        if (isDifferenceMode && selectedModels.length > 0) {
+            // Difference Mode Logic
+            updateBaselineSelector(selectedModels, baselineModelSelector);
+            const baselineModelName = baselineModelSelector.value;
+            const baselineModel = radarData.find(m => m.model_name === baselineModelName);
+
+            if (baselineModel) {
+                selectedModels.forEach(modelName => {
+                    if (modelName === baselineModelName) return; // Don't plot baseline against itself
+                    const model = radarData.find(m => m.model_name === modelName);
+                    if (model) {
+                        const diffs = visibleCategories.map(cat => (model[cat] || 0) - (baselineModel[cat] || 0));
+                        traces.push({
+                            type: 'scatterpolar', r: diffs, theta: visibleCategories, fill: 'toself', name: `${modelName} vs ${baselineModelName}`
+                        });
+                        maxVal = Math.max(maxVal, ...diffs.map(Math.abs));
+                    }
+                });
+                const axisRange = maxVal > 0 ? [-maxVal * 1.1, maxVal * 1.1] : [-1, 1];
+                layout = getRadarLayout(`Difference from ${baselineModelName}`, axisRange);
+            }
+        } else {
+            // Absolute Score Logic
+            baselineModelSelector.style.display = 'none';
+            selectedModels.forEach(modelName => {
+                const model = radarData.find(m => m.model_name === modelName);
+                if (model) {
+                    const values = visibleCategories.map(cat => model[cat] || 0);
+                    traces.push({
+                        type: 'scatterpolar', r: values, theta: visibleCategories, fill: 'toself', name: modelName
+                    });
+                    maxVal = Math.max(maxVal, ...values);
+                }
+            });
+            layout = getRadarLayout('Model Score Composition Comparison', [0, Math.max(1, maxVal * 1.1)]);
+        }
+        
+        Plotly.newPlot(document.getElementById('radarChartContainer'), traces, layout);
+    }
+    
+    function updateBarChart(selectedModels) {
+        const radarDataElement = document.getElementById('radarData');
+        const radarData = JSON.parse(radarDataElement.dataset.models);
+
+        const isDifferenceMode = document.getElementById('differenceModeToggle').checked;
+        const baselineModelSelector = document.getElementById('baselineModelSelector');
+
+        const visibleCategories = Array.from(document.querySelectorAll('.category-checkbox:checked')).map(cb => cb.value);
+
+        if (visibleCategories.length === 0) {
+            Plotly.newPlot(document.getElementById('barChartContainer'), [], {title: 'Please select at least one category.'});
+            return;
+        }
+        
+        let traces = [];
+        let layout;
+        let title = 'Model Score Comparison';
+
+        if (isDifferenceMode && selectedModels.length > 0) {
+            updateBaselineSelector(selectedModels, baselineModelSelector);
+            const baselineModelName = baselineModelSelector.value;
+            const baselineModel = radarData.find(m => m.model_name === baselineModelName);
+            
+            title = `Score Difference from ${baselineModelName}`;
+
+            if (baselineModel) {
+                selectedModels.forEach(modelName => {
+                    if (modelName === baselineModelName) return;
+                    const model = radarData.find(m => m.model_name === modelName);
+                    if (model) {
+                        const diffs = visibleCategories.map(cat => (model[cat] || 0) - (baselineModel[cat] || 0));
+                        traces.push({
+                            type: 'bar',
+                            x: visibleCategories,
+                            y: diffs,
+                            name: `${modelName} vs ${baselineModelName}`
+                        });
+                    }
+                });
+            }
+        } else {
+            baselineModelSelector.style.display = 'none';
+            selectedModels.forEach(modelName => {
+                const model = radarData.find(m => m.model_name === modelName);
+                if (model) {
+                    traces.push({
+                        type: 'bar',
+                        x: visibleCategories,
+                        y: visibleCategories.map(cat => model[cat] || 0),
+                        name: modelName
+                    });
+                }
+            });
+        }
+        
+        layout = {
+            title: title,
+            barmode: 'group',
+            xaxis: { title: 'Score Category' },
+            yaxis: { title: 'Score' },
+            legend: { x: 0.5, y: -0.2, xanchor: 'center', orientation: 'h' }
+        };
+
+        Plotly.newPlot(document.getElementById('barChartContainer'), traces, layout);
+    }
+
+    function getRadarLayout(title, range) {
+        return {
+            polar: { radialaxis: { visible: true, range: range } },
+            showlegend: true,
+            title: title,
+            legend: { x: 0.5, y: -0.1, xanchor: 'center', orientation: 'h' }
+        };
+    }
+
+    function updateBaselineSelector(selectedModels, selector) {
+        const currentlySelected = selector.value;
+        selector.innerHTML = '';
+        selectedModels.forEach(modelName => {
+            const option = document.createElement('option');
+            option.value = option.textContent = modelName;
+            selector.appendChild(option);
+        });
+        
+        if (selectedModels.includes(currentlySelected)) {
+            selector.value = currentlySelected;
+        }
+        
+        selector.style.display = selectedModels.length > 0 ? 'inline-block' : 'none';
+    }
+
+</script>
+</body>
+</html> 
