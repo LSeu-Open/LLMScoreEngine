@@ -28,14 +28,16 @@ Originally developed within the [AIenhancedWork](https://github.com/LSeu-Open/AI
 - **Community score** (20 points max)
 - **Technical specifications** (20 points max)
 
-The final score is calculated out of 100 points (if you want to have a detailed breakdown of the scoring framework, please refer to the [scoring_framework.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/scoring_framework.md) file).
+The final score is calculated out of 100 points (if you want to have a detailed breakdown of the scoring framework, please refer to the [scoring_framework_development_notes.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/dev_ideas/scoring_framework_development_notes.md) file).
 
 Please note that this is a beta version and the scoring system is subject to change.
 
 To help us refine and improve LLMScoreEngine during this beta phase, we actively encourage user feedback, bug reports, and contributions to help us refine and improve LLMScoreEngine. Please feel free to [open an issue](https://github.com/LSeu-Open/LLMScoreEngine/issues) or [contribute](CONTRIBUTING.md) to the project. Make sure to respect the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-> [!NOTE]
-> Following the v0.5.0 update, which introduced modular configuration capabilities, we are now developing a dedicated version of this evaluation system tailored for Vision Language Models (VLMs). This development is ongoing in its [dedicated Repository](https://github.com/LSeu-Open/VLMScoreEngine).
+## New features in Beta v0.6
+
+- Updated technical score calculation to take into account the input and output price of the model.
+- Added a new CLI option to generate a graph report from the existing csv report.
 
 ## Project Structure
 
@@ -53,6 +55,8 @@ LLMScoreEngine/
 │   │   └── models_scoring.py
 │   ├── utils/                 # Utility functions
 │   │   ├── config_loader.py
+│   │   ├── csv_reporter.py
+│   │   └── graph_reporter.py
 │   │   └── logging.py
 │   ├── __init__.py
 │   └── run_scoring.py         # Script for running scoring programmatically
@@ -67,7 +71,9 @@ LLMScoreEngine/
 │   │   ├── test_hf_score.py
 │   │   └── test_models_scoring.py
 │   ├── utils/
-│   │   └── test_config_loader.py
+│   │   ├── test_config_loader.py
+│   │   └── test_csv_reporter.py
+│   │   └── test_graph_reporter.py
 │   ├── __init__.py
 │   └── test_run_scoring.py
 ├── LICENSE                    # Project license file
@@ -203,7 +209,8 @@ Models data should be stored as JSON files in the `Models` directory, with the f
         "hf_score": null
     },
     "model_specs": {
-        "price": null,
+        "input_price": null,
+        "output_price": null,
         "context_window": null,
         "param_count": null,
         "architecture": null
@@ -293,6 +300,7 @@ You can customize the scoring process with the following optional flags:
 | `--quiet`            | Suppress all informational output and only print the final scores in the console. Useful for scripting. | `python score_models.py --all --quiet`              |
 | `--config <path>`    | Path to a custom Python configuration file to override the default scoring parameters.                  | `python score_models.py ModelName --config my_config.py` |
 | `--csv`              | Generate a CSV report from existing results.                                                            | `python score_models.py --csv`                      |
+| `--graph`            | Generate a graph report from existing csv report.                                                          | `python score_models.py --graph`                    |
 
 ### IDE Usage
 
@@ -304,87 +312,76 @@ Results will be stored as JSON files in the `Results` directory, with the follow
 
 ```json
 {
-    "model_name": "Deepseek-R1",
-    "scores": {
-        "entity_score": 18.84257142857143,
-        "dev_score": 23.063999999999997,
-        "external_score": 41.906571428571425,
-        "community_score": 16.76,
-        "technical_score": 16.95878387917363,
-        "final_score": 75.63,
-        "avg_performance": 73.21368421052631
+    "entity_benchmarks": {
+        "artificial_analysis": 60.22,
+        "OpenCompass": 86.7,
+        "LLM Explorer": 59.0,
+        "Livebench": 72.49,
+        "open_llm": null,
+        "UGI Leaderboard": 55.65,
+        "big_code_bench": 35.1,
+        "EvalPlus Leaderboard": null,
+        "Dubesord_LLM": 70.5,
+        "Open VLM": null
     },
-    "input_data": {
-        "entity_benchmarks": {
-            "artificial_analysis": 0.6022,
-            "OpenCompass": 0.867,
-            "LLM Explorer": 0.59,
-            "Livebench": 0.7249,
-            "open_llm": null,
-            "UGI Leaderboard": 0.5565,
-            "big_code_bench": 0.35100000000000003,
-            "EvalPlus Leaderboard": null,
-            "Dubesord_LLM": 0.705,
-            "Open VLM": null
-        },
-        "dev_benchmarks": {
-            "MMLU": 0.9079999999999999,
-            "MMLU Pro": 0.84,
-            "BigBenchHard": null,
-            "GPQA diamond": 0.715,
-            "DROP": 0.922,
-            "HellaSwag": null,
-            "Humanity's Last Exam": null,
-            "ARC-C": null,
-            "Wild Bench": null,
-            "MT-bench": null,
-            "IFEval": 0.833,
-            "Arena-Hard": 0.9229999999999999,
-            "MATH": 0.973,
-            "GSM-8K": null,
-            "AIME": 0.7979999999999999,
-            "HumanEval": null,
-            "MBPP": null,
-            "LiveCodeBench": 0.659,
-            "Aider Polyglot": 0.5329999999999999,
-            "SWE-Bench": 0.49200000000000005,
-            "SciCode": null,
-            "MGSM": null,
-            "MMMLU": null,
-            "C-Eval or CMMLU": 0.9179999999999999,
-            "AraMMLu": null,
-            "LongBench": null,
-            "RULER 128K": null,
-            "RULER 32K": null,
-            "MTOB": null,
-            "BFCL": null,
-            "AgentBench": null,
-            "Gorilla Benchmark": null,
-            "ToolBench": null,
-            "MINT": null,
-            "MMMU": null,
-            "Mathvista": null,
-            "ChartQA": null,
-            "DocVQA": null,
-            "AI2D": null
-        },
-        "community_score": {
-            "lm_sys_arena_score": 1363,
-            "hf_score": 9.5
-        },
-        "model_specs": {
-            "price": 0.55,
-            "context_window": 128000,
-            "param_count": 685,
-            "architecture": "moe"
-        }
+    "dev_benchmarks": {
+        "MMLU": 90.8, 
+        "MMLU Pro": 84.0, 
+        "BigBenchHard": null,
+        "GPQA diamond": 71.5, 
+        "DROP": 92.2, 
+        "HellaSwag": null,
+        "Humanity's Last Exam": null,
+        "ARC-C": null,
+        "Wild Bench": null,
+        "MT-bench": null,
+        "IFEval": 83.3,
+        "Arena-Hard": 92.3,
+        "MATH": 97.3,
+        "GSM-8K": null,
+        "AIME": 79.8,
+        "HumanEval": null,
+        "MBPP": null,
+        "LiveCodeBench": 65.9,
+        "Aider Polyglot": 53.3,
+        "SWE-Bench": 49.2,
+        "SciCode": null,
+        "MGSM": null,
+        "MMMLU": null,
+        "C-Eval or CMMLU": 91.8,
+        "AraMMLu": null,
+        "LongBench": null,
+        "RULER 128K": null,
+        "RULER 32K": null,
+        "MTOB": null,
+        "BFCL": null,
+        "AgentBench": null,
+        "Gorilla Benchmark": null,
+        "ToolBench": null,
+        "MINT": null,
+        "MMMU": null,
+        "Mathvista": null,
+        "ChartQA": null,
+        "DocVQA": null,
+        "AI2D": null
+    },
+    "community_score": {
+        "lm_sys_arena_score": 1389,
+        "hf_score": 8.79
+    },
+    "model_specs": {
+        "input_price": 0.55,
+        "output_price": 2.19,
+        "context_window": 128000,
+        "param_count": 685,
+        "architecture": "moe"
     }
 }
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/LSeu-Open/LLMScoreEngine/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE-CODE.md](https://github.com/LSeu-Open/AIEnhancedWork/blob/main/LICENSE-CODE.md) file for details.
 
 <br>
 
