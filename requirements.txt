@@ -6,3 +6,6 @@ flake8>=6.0.0  # for linting
 argparse>=1.4.0  # for CLI support 
 huggingface-hub>=0.20.0 # for Hugging Face model information 
 python>=3.11
+pandas
+plotly
+Jinja2
