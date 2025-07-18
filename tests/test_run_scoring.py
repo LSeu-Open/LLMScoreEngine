@@ -20,7 +20,6 @@ Tests for the main scoring runner.
 # ------------------------------------------------------------------------------------------------
 
 import pytest
-import json
 from unittest.mock import patch, MagicMock, call
 
 from model_scoring import run_scoring
