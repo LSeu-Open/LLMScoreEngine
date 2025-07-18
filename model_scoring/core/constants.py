@@ -87,6 +87,6 @@ REQUIRED_SECTIONS = {
         'DocVQA',
         'AI2D',
     ],
-    'model_specs': ['price', 'context_window', 'param_count', 'architecture'],
+    'model_specs': ['input_price', 'output_price', 'context_window', 'param_count', 'architecture'],
     'community_score': ['lm_sys_arena_score', 'hf_score']
 } 
