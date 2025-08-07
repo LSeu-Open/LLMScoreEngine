@@ -448,7 +448,17 @@ def generate_report(template_dir=None):
         df_cost = df[df['total_price'] > 0].copy()
         df_cost['cost_efficiency'] = (df_cost['final_score'] / df_cost['total_price']).round(2)
         cost_efficiency_data = df_cost.sort_values(by='cost_efficiency', ascending=False)
-        cost_efficiency_data = cost_efficiency_data[['model_name', 'cost_efficiency', 'final_score', 'input_price', 'output_price']]
+        
+        # Ensure param_count and architecture are included for filtering
+        required_cols = ['model_name', 'cost_efficiency', 'final_score', 'input_price', 'output_price', 'param_count', 'architecture']
+        for col in required_cols:
+            if col not in cost_efficiency_data.columns:
+                cost_efficiency_data[col] = '' # Add missing columns
+
+        cost_efficiency_data = cost_efficiency_data[required_cols]
+        cost_efficiency_data.fillna({'param_count': 0, 'architecture': 'N/A'}, inplace=True)
+        cost_efficiency_data['param_count'] = pd.to_numeric(cost_efficiency_data['param_count'], errors='coerce').fillna(0)
+        
         cost_efficiency_data = cost_efficiency_data.to_dict(orient='records')
 
     # Generate all components for the report
@@ -465,9 +475,9 @@ def generate_report(template_dir=None):
 
     # Prepare template variables
     template_vars = {
-        "report_title": "LLM Scoring Engine - Performance Report",
+        "report_title": "LLM Performance Analysis Report",
+        "intro_text": "This report provides a comprehensive analysis of Large Language Model (LLM) performance based on various scoring metrics. This report has been produced based on the result of the <a href='https://github.com/LSeu-Open/LLMScoreEngine'>LLM Score Engine</a> Project. Use the tabs below to navigate to different sections of the report. For more details on the scoring metrics, please refer to the <a href='https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/scoring_framework.md'>scoring metrics documentation</a>.",
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "intro_text": "This report provides a comprehensive analysis of Large Language Model (LLM) performance based on various scoring metrics. Use the tabs below to navigate to different sections of the report. For more details on the scoring metrics, please refer to the <a href='https://github.com/LSeu-Open/AIEnhancedWork/blob/main/Scoring/scoring_framework.md'>scoring metrics documentation</a>.",
         "summary_data": summary_data,
         "leaderboard_data": leaderboard_data,
         "leaderboard_headers": leaderboard_headers,
