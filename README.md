@@ -17,6 +17,22 @@
 
 <br>
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Model Data Setup](#model-data-setup)
+  - [Models Data Format](#models-data-format)
+    - [Where to find the data ?](#where-to-find-the-data-)
+- [Usage](#usage)
+  - [Visualize All Your Models Scores in One Powerful Report](#visualize-all-your-models-scores-in-one-powerful-report)
+  - [Command-Line Usage](#command-line-usage)
+  - [Command-Line Options](#command-line-options)
+  - [IDE Usage](#ide-usage)
+- [Results Data Format](#results-data-format)
+- [License](#license)
+
 ## Overview
 
 This project provides tools for scoring and comparing large language models based on the following criteria:
@@ -33,11 +49,6 @@ The final score is calculated out of 100 points (if you want to have a detailed 
 Please note that this is a beta version and the scoring system is subject to change.
 
 To help us refine and improve LLMScoreEngine during this beta phase, we actively encourage user feedback, bug reports, and contributions to help us refine and improve LLMScoreEngine. Please feel free to [open an issue](https://github.com/LSeu-Open/LLMScoreEngine/issues) or [contribute](CONTRIBUTING.md) to the project. Make sure to respect the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-## New features in Beta v0.6
-
-- Updated technical score calculation to take into account the input and output price of the model.
-- Added a new CLI option to generate a graph report from the existing csv report.
 
 ## Project Structure
 
@@ -267,6 +278,38 @@ python model_scoring/scoring/hf_score.py deepseek-ai/DeepSeek-R1
 - `model_specs` : You will find the price on the model's page on the provider's website or on the model's page on the [Hugging Face](https://huggingface.co/) website. Some of this data can also be found on the [Artificial Analysis](https://artificialanalysis.ai/) website.
 
 ## Usage
+
+### Visualize All Your Models Scores in One Powerful Report
+
+Discover everything you need to evaluate performance and efficiency at a glance:
+
+- **Interactive Leaderboard**: Rank all your models with smart filters for quick comparisons.
+- **Insightful Visualizations**: Explore key metrics including:
+  - Performance vs. Parameter Count  
+  - Score Composition  
+  - Cost Analysis  
+  - Architecture Distribution
+- **Cost-Efficiency Leaderboard**: Identify the best-performing models relative to their cost.
+- **Model Comparison Tool**: Easily compare multiple models side by side.
+
+All insights in one unified, actionable report — no more scattered data.
+
+<img src="https://github.com/LSeu-Open/LLMScoreEngine/blob/main/Graph_Report.png" height="800">
+
+Create this comprehensive report from your models in just two commands:
+
+1. Run a silent, CSV-exported model evaluation :
+
+```bash
+python score_models.py --all --quiet --csv
+```
+
+2. Generate visualizations and the final report :
+
+```bash
+python score_models.py --graph
+```
+<br>
 
 ### Command-Line Usage
 
