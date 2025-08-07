@@ -15,978 +15,1120 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" integrity="sha512-vraQS/OZFHuvgZieeDWZXJAEjwG64idiKcBkggAv/rWn9zk3CMMifiy29DoP+kX72GCfo7KiqZdSnEgZB9vGVA==" crossorigin="anonymous">
     <style>
         :root {
-            --primary-color: #1976D2; /* Material Blue 700 */
-            --primary-light: #64B5F6; /* Material Blue 300 */
-            --primary-dark: #0D47A1;  /* Material Blue 900 */
-            --text-color: #212121;
-            --secondary-text-color: #757575;
-            --background-color: #f5f5f5;
-            --card-background: #ffffff;
-            --divider-color: #e0e0e0;
-            --shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-            --shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
-        }
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 24px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .card {
-            background: var(--card-background);
-            border-radius: 8px;
-            box-shadow: var(--shadow-1);
-            padding: 24px;
-            margin-bottom: 24px;
-            transition: all 0.3s cubic-bezier(.25,.8,.25,1);
-        }
-        .card:hover {
-            box-shadow: var(--shadow-2);
-        }
-        h1, h2, h3, h4 {
-            font-weight: 500;
-        }
-        h1 {
-            color: var(--primary-dark);
-            font-size: 2.5em;
-            margin-top: 0;
-            margin-bottom: 8px;
-        }
-        h2 {
-            color: var(--primary-color);
-            font-size: 1.8em;
-            padding-bottom: 8px;
-            margin-top: 0;
-        }
-        h3 {
-             color: var(--primary-dark);
-             font-size: 1.4em;
-             margin-top: 24px;
-             margin-bottom: 12px;
-             border-bottom: 1px solid var(--divider-color);
-             padding-bottom: 8px;
-        }
-        .timestamp {
-            font-style: italic;
-            color: var(--secondary-text-color);
-            margin-bottom: 16px;
-        }
-        
-        /* Tab container styles */
-        .tab-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 8px;
-            border-bottom: 2px solid var(--divider-color);
-            margin-bottom: 24px;
-            background: linear-gradient(90deg, rgba(25, 118, 210, 0.05) 0%, rgba(25, 118, 210, 0.02) 100%);
-            border-radius: 8px 8px 0 0;
-            padding: 8px;
-        }
+    --primary-color: #ff3e00; /* Svelte Orange */
+    --primary-light: #ff7a59;
+    --primary-dark: #b32b00;
+    --text-color: #333333;
+    --secondary-text-color: #676767;
+    --background-color: #f9f9f9;
+    --card-background: #ffffff;
+    --divider-color: #eaeaea;
+    --shadow-1: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-2: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    scroll-behavior: smooth;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 24px;
+}
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.card {
+    background: var(--card-background);
+    border-radius: 4px;
+    box-shadow: var(--shadow-1);
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: all 0.2s cubic-bezier(.25,.8,.25,1);
+    border: 1px solid var(--divider-color);
+}
+.card:hover {
+    box-shadow: var(--shadow-2);
+    border-color: #dddddd;
+}
+h1, h2, h3, h4 {
+    font-weight: 700;
+}
+h1 {
+    color: #000000;
+    font-size: 2.5em;
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+h2 {
+    color: #111111;
+    font-size: 1.8em;
+    padding-bottom: 8px;
+    margin-top: 0;
+}
+h3 {
+     color: #222222;
+     font-size: 1.4em;
+     margin-top: 24px;
+     margin-bottom: 12px;
+     border-bottom: 1px solid var(--divider-color);
+     padding-bottom: 8px;
+}
+.timestamp {
+    font-style: italic;
+    color: var(--secondary-text-color);
+    margin-bottom: 8px;
+}
 
-        .tab-container button {
-            background-color: transparent;
-            border: none;
-            outline: none;
-            cursor: pointer;
-            padding: 16px 12px;
-            transition: all 0.3s ease;
-            font-size: 0.95em;
-            color: var(--secondary-text-color);
-            font-weight: 500;
-            border-radius: 6px;
-            position: relative;
-            text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+/* Tab container styles */
+.tab-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    border-bottom: 1px solid var(--divider-color);
+    margin-bottom: 24px;
+}
 
-        .tab-container button:hover {
-            background-color: rgba(25, 118, 210, 0.08);
-            color: var(--primary-color);
-            transform: translateY(-2px);
-        }
+.tab-container button {
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    outline: none;
+    cursor: pointer;
+    padding: 14px 8px;
+    margin-bottom: -1px; /* Overlap the container's bottom border */
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+    color: var(--secondary-text-color);
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.4;
+    white-space: normal;
+}
 
-        .tab-container button.active {
-            color: var(--primary-color);
-            background-color: var(--card-background);
-            border-bottom: 3px solid var(--primary-color);
-            box-shadow: 0 -2px 8px rgba(25, 118, 210, 0.15);
-        }
+.tab-container button:hover {
+    color: var(--primary-color);
+    background-color: #f9f9f9;
+}
 
-        .tab-container button.active::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 30px;
-            height: 3px;
-            background: var(--primary-color);
-            border-radius: 2px;
-        }
+.tab-container button.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background-color: transparent;
+    box-shadow: none;
+}
 
-        /* Responsive tab layout */
-        @media (max-width: 1200px) {
-            .tab-container {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
+/* Responsive tab layout */
+@media (max-width: 1024px) {
+    .tab-container {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
 
-        @media (max-width: 768px) {
-            .tab-container {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 6px;
-                padding: 6px;
-            }
-            
-            .tab-container button {
-                padding: 12px 8px;
-                font-size: 0.85em;
-            }
-        }
+@media (max-width: 768px) {
+    .tab-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
 
-        @media (max-width: 480px) {
-            .tab-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .tab-container button {
-                padding: 14px 12px;
-                font-size: 0.9em;
-            }
-        }
+@media (max-width: 480px) {
+    .tab-container {
+        grid-template-columns: 1fr;
+    }
+}
 
-        .tab-content {
-            display: none;
-        }
+.tab-content {
+    display: none;
+}
 
-        .tab-content.active {
-            display: block;
-        }
+.tab-content.active {
+    display: block;
+}
 
-        .toc {
-            list-style-type: none;
-            padding: 0;
-        }
-        .toc li {
-            margin: 12px 0;
-        }
-        .toc a {
-            text-decoration: none;
-            color: var(--primary-color);
-            font-weight: 500;
-            font-size: 1.1em;
-        }
-        .toc a:hover {
-            text-decoration: underline;
-            color: var(--primary-dark);
-        }
-        .summary-container {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            gap: 20px;
-            padding: 20px 0;
-        }
-        .summary-card {
-            background: #fafafa;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            transition: all 0.3s ease;
-            border-bottom: 4px solid var(--divider-color);
-        }
-        .side-card {
-            flex: 1;
-        }
-        .center-card {
-            flex: 1.5;
-            padding: 30px;
-            border-color: var(--primary-color);
-            transform: scale(1.05);
-            box-shadow: var(--shadow-2);
-        }
-        .summary-card h4 {
-            margin: 0 0 12px 0;
-            color: var(--secondary-text-color);
-            font-size: 1em;
-            font-weight: 400;
-        }
-        .summary-card p {
-            margin: 0;
-            font-size: 1.5em;
-            font-weight: 500;
-            color: var(--primary-dark);
-        }
-        .center-card p {
-            font-size: 2em;
-        }
+.toc {
+    list-style-type: none;
+    padding: 0;
+}
+.toc li {
+    margin: 12px 0;
+}
+.toc a {
+    text-decoration: none;
+    color: var(--primary-color);
+    font-weight: 500;
+    font-size: 1.1em;
+}
+.toc a:hover {
+    text-decoration: underline;
+    color: var(--primary-dark);
+}
+.summary-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 0;
+}
+.summary-card {
+    background: var(--card-background);
+    padding: 20px;
+    border-radius: 4px;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 1px solid var(--divider-color);
+}
+.side-card {
+    flex: 1;
+}
+.center-card {
+    flex: 1.5;
+    padding: 30px;
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+    box-shadow: var(--shadow-2);
+}
+.summary-card h4 {
+    margin: 0 0 12px 0;
+    color: var(--secondary-text-color);
+    font-size: 1em;
+    font-weight: 400;
+}
+.summary-card p {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 500;
+    color: var(--primary-dark);
+}
+.center-card p {
+    font-size: 2em;
+}
 
-        /* Table styles */
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 0.9em;
-        }
-        .leaderboard-table th, .leaderboard-table td {
-            padding: 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--divider-color);
-            vertical-align: middle;
-            word-wrap: break-word;
-        }
-        .leaderboard-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-        .leaderboard-table .col-model_name {
-            text-align: left;
-            font-weight: 500;
-        }
-        .leaderboard-table th {
-            font-weight: 700;
-            color: var(--secondary-text-color);
-            background-color: transparent;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 0.05em;
-            border-bottom: 2px solid var(--divider-color);
-            cursor: pointer;
-            position: relative;
-        }
-        .leaderboard-table th:hover {
-            background-color: rgba(0,0,0,0.02);
-        }
-        .leaderboard-table th .sort-icon {
-            margin-left: 8px;
-            position: relative;
-            display: inline-block;
-            width: 1em;
-            height: 1em;
-            vertical-align: middle;
-            top: -1px;
-        }
-        .sort-icon::before,
-        .sort-icon::after {
-            content: "";
-            display: block;
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            transition: all 0.2s ease-in-out;
-        }
-        .sort-icon::before { /* Up arrow */
-            top: 2px;
-            border-bottom: 5px solid var(--secondary-text-color);
-            opacity: 0.3;
-        }
-        .sort-icon::after { /* Down arrow */
-            bottom: 2px;
-            border-top: 5px solid var(--secondary-text-color);
-            opacity: 0.3;
-        }
-        .leaderboard-table th.sorted-asc .sort-icon::before {
-            border-bottom-color: var(--primary-color);
-            opacity: 1;
-        }
-        .leaderboard-table th.sorted-desc .sort-icon::after {
-            border-top-color: var(--primary-color);
-            opacity: 1;
-        }
-        .leaderboard-table th.sorted-asc .sort-icon,
-        .leaderboard-table th.sorted-desc .sort-icon {
-            opacity: 1;
-        }
-        .leaderboard-table tbody tr {
-            transition: background-color 0.2s ease;
-        }
-        .leaderboard-table tr:nth-child(even) {
-            background-color: transparent;
-        }
-        .leaderboard-table tbody tr:hover {
-            background-color: rgba(0, 0, 0, 0.04);
-        }
-        .leaderboard-table .col-final_score {
-            font-weight: 700;
-            color: var(--primary-dark);
-        }
+/* Table styles */
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.9em;
+}
+.leaderboard-table th, .leaderboard-table td {
+    padding: 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--divider-color);
+    vertical-align: middle;
+    word-wrap: break-word;
+}
+.leaderboard-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.leaderboard-table .col-model_name {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-color);
+}
+.leaderboard-table th {
+    font-weight: 600;
+    color: var(--secondary-text-color);
+    background-color: transparent;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--divider-color);
+    cursor: pointer;
+    position: relative;
+}
+.leaderboard-table th:hover {
+    background-color: rgba(0,0,0,0.02);
+}
+.leaderboard-table th .sort-icon {
+    margin-left: 8px;
+    position: relative;
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: middle;
+    top: -1px;
+}
+.sort-icon::before,
+.sort-icon::after {
+    content: "";
+    display: block;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    transition: all 0.2s ease-in-out;
+}
+.sort-icon::before { /* Up arrow */
+    top: 2px;
+    border-bottom: 5px solid var(--secondary-text-color);
+    opacity: 0.3;
+}
+.sort-icon::after { /* Down arrow */
+    bottom: 2px;
+    border-top: 5px solid var(--secondary-text-color);
+    opacity: 0.3;
+}
+.leaderboard-table th.sorted-asc .sort-icon::before {
+    border-bottom-color: var(--primary-color);
+    opacity: 1;
+}
+.leaderboard-table th.sorted-desc .sort-icon::after {
+    border-top-color: var(--primary-color);
+    opacity: 1;
+}
+.leaderboard-table th.sorted-asc .sort-icon,
+.leaderboard-table th.sorted-desc .sort-icon {
+    opacity: 1;
+}
+.leaderboard-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+.leaderboard-table tr:nth-child(even) {
+    background-color: transparent;
+}
+.leaderboard-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+.leaderboard-table .col-final_score {
+    font-weight: 700;
+    color: var(--primary-dark);
+}
 
-        .leaderboard-table td:not(.col-model_name),
-        .leaderboard-table th:not(.col-model_name) {
-            text-align: center;
-        }
+.leaderboard-table td:not(.col-model_name),
+.leaderboard-table th:not(.col-model_name) {
+    text-align: center;
+}
 
-        .leaderboard-table th.col-model_name {
-            text-align: left;
-        }
+.leaderboard-table th.col-model_name {
+    text-align: left;
+}
 
-        /* Column Toggle Styles */
-        .column-toggle-container {
-            text-align: left;
-            margin-bottom: 10px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .column-toggle-btn-wrapper {
-            position: relative;
-        }
-        .column-toggle-btn {
-            background: var(--primary-color);
-            color: white;
-            padding: 8px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .column-toggle-dropdown {
-            display: none;
-            position: absolute;
-            background-color: #f9f9f9;
-            min-width: 160px;
-            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-            z-index: 1;
-            border-radius: 4px;
-            padding: 8px 0;
-        }
-        .column-toggle-dropdown label {
-            display: block;
-            padding: 8px 16px;
-            cursor: pointer;
-        }
-        .column-toggle-dropdown label:hover {
-            background-color: #f1f1f1;
-        }
-        #modelSearchInput {
-            padding: 8px 12px;
-            border: 1px solid var(--divider-color);
-            border-radius: 4px;
-            font-size: 1em;
-            flex-grow: 1; /* Allow the search box to take up remaining space */
-        }
-        .arch-filter-container {
-            display: flex;
-            background-color: #e9ecef;
-            border-radius: 6px;
-            padding: 4px;
-        }
-        .arch-filter-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            background-color: transparent;
-            color: var(--secondary-text-color);
-            font-weight: 500;
-            transition: all 0.2s ease-in-out;
-        }
-        .arch-filter-btn.active {
-            background-color: white;
-            color: var(--primary-color);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .leaderboard-summary {
-            display: flex;
-            gap: 24px;
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--divider-color);
-        }
-        .summary-item {
-            text-align: left;
-        }
-        .summary-value {
-            font-size: 2em;
-            font-weight: 500;
-            color: var(--primary-dark);
-            display: block;
-        }
-        .summary-label {
-            font-size: 0.9em;
-            color: var(--secondary-text-color);
-        }
-        /* Parameter Filter Button Styles */
-        .param-filter-container {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        .param-filter-btn {
-            padding: 6px 12px;
-            border: 1px solid var(--divider-color);
-            border-radius: 4px;
-            cursor: pointer;
-            background-color: transparent;
-            color: var(--secondary-text-color);
-            font-weight: 500;
-            transition: all 0.2s ease-in-out;
-        }
-        .param-filter-btn:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-        .param-filter-btn.active {
-            background-color: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-        /* Range Slider Styles */
-        .range-slider-container {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 4px;
-        }
-        .range-slider-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .range-slider-header label {
-            font-weight: 500;
-            color: var(--secondary-text-color);
-            margin: 0;
-        }
-        .range-slider-values {
-            font-weight: 500;
-            color: var(--primary-dark);
-        }
-        .slider-wrapper {
-            position: relative;
-            height: 20px;
-        }
-        .slider-track, .slider-highlight {
-            position: absolute;
-            height: 6px;
-            border-radius: 3px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 100%;
-        }
-        .slider-track {
-            background-color: var(--divider-color);
-            z-index: 1;
-        }
-        .slider-highlight {
-            background-color: var(--primary-light);
-            z-index: 2;
-        }
-        .slider-wrapper input[type=range] {
-            position: absolute;
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 20px; /* Full height for thumb interaction */
-            background: transparent;
-            pointer-events: none; /* Interact with thumbs only */
-            z-index: 3;
-            margin: 0;
-        }
-        .slider-wrapper input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: var(--primary-color);
-            cursor: pointer;
-            border-radius: 50%;
-            pointer-events: auto; /* Allow thumb interaction */
-        }
-        /* Header styles */
-        .header {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            color: white;
-            padding: 32px 24px;
-            margin: -24px -24px 24px -24px;
-            border-radius: 0 0 16px 16px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-            opacity: 0.3;
-        }
-        
-        .header-content {
-            position: relative;
-            z-index: 1;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .header h1 {
-            color: white;
-            font-size: 2.5em;
-            font-weight: 300;
-            margin: 0 0 8px 0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            animation: slideInFromTop 0.8s ease-out;
-            text-align: center;
-        }
-        
-        .header-subtitle {
-            font-size: 1.1em;
-            font-weight: 400;
-            opacity: 0.9;
-            margin-bottom: 20px;
-            animation: slideInFromTop 0.8s ease-out 0.2s both;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 16px 20px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .header-subtitle a {
-            color: rgba(255, 255, 255, 0.95);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 2px 6px;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
-        }
-        
-        .header-subtitle a:hover {
-            color: white;
-            background: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        .header-stats {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-top: 20px;
-            animation: slideInFromTop 0.8s ease-out 0.4s both;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .stat-item {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            padding: 12px 18px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            opacity: 0.7;
-        }
-        
-        .stat-item.highlight {
-            background: rgba(255, 255, 255, 0.25);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            opacity: 1;
-            transform: scale(1.05);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-        }
-        
-        .stat-item:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            opacity: 1;
-        }
-        
-        .stat-item.highlight:hover {
-            transform: scale(1.05) translateY(-2px);
-        }
-        
-        .stat-value {
-            font-size: 1.8em;
-            font-weight: 500;
-            display: block;
-            margin-bottom: 4px;
-        }
-        
-        .stat-item.highlight .stat-value {
-            font-size: 2.2em;
-        }
-        
-        .stat-label {
-            font-size: 0.85em;
-            opacity: 0.8;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .timestamp {
-            font-style: italic;
-            color: rgba(255, 255, 255, 0.8);
-            margin-top: 16px;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            justify-content: center;
-        }
-        
-        .timestamp::before {
-            content: '⏱️';
-            font-size: 1.1em;
-        }
-        
-        /* Animations */
-        @keyframes slideInFromTop {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        /* Responsive header */
-        @media (max-width: 768px) {
-            .header {
-                padding: 24px 16px;
-            }
-            
-            .header h1 {
-                font-size: 2.2em;
-            }
-            
-            .header-subtitle {
-                font-size: 1em;
-                padding: 14px 16px;
-                margin-bottom: 16px;
-            }
-            
-            .header-subtitle a {
-                padding: 3px 8px;
-                font-size: 0.95em;
-            }
-            
-            .header-stats {
-                gap: 12px;
-                flex-direction: column;
-            }
-            
-            .stat-item {
-                padding: 10px 14px;
-                width: 100%;
-                text-align: center;
-            }
-            
-            .stat-value {
-                font-size: 1.6em;
-            }
-            
-            .stat-item.highlight .stat-value {
-                font-size: 1.9em;
-            }
-        }
-        /* Model Comparison Section */
-        .comparison-container {
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-        }
+/* Column Toggle Styles */
+.column-toggle-container {
+    text-align: left;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.column-toggle-btn-wrapper {
+    position: relative;
+}
+.column-toggle-btn {
+    background: var(--primary-color);
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.column-toggle-dropdown {
+    display: none;
+    position: absolute;
+    background-color: #ffffff;
+    min-width: 160px;
+    box-shadow: var(--shadow-2);
+    z-index: 10;
+    border-radius: 4px;
+    padding: 8px 0;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--divider-color);
+}
+.column-toggle-dropdown label {
+    display: block;
+    padding: 8px 16px;
+    cursor: pointer;
+}
+.column-toggle-dropdown label:hover {
+    background-color: #f1f1f1;
+}
+#modelSearchInput {
+    padding: 8px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    font-size: 1em;
+    flex-grow: 1; /* Allow the search box to take up remaining space */
+}
+#modelSearchInput:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(255, 62, 0, 0.2);
+}
 
-        .model-selector {
-            flex: 1;
-            min-width: 250px;
-            max-width: 300px;
-            background-color: var(--card-background);
-            padding: 16px;
-            border-radius: 8px;
-            align-self: flex-start;
-            border: 1px solid var(--divider-color);
-            box-shadow: var(--shadow-1);
-        }
+.arch-filter-container {
+    display: flex;
+    background-color: #e9ecef;
+    border-radius: 6px;
+    padding: 4px;
+}
+.arch-filter-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--secondary-text-color);
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+.arch-filter-btn.active {
+    background-color: white;
+    color: var(--primary-color);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.leaderboard-summary {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--divider-color);
+}
+.summary-item {
+    text-align: left;
+}
+.summary-value {
+    font-size: 2em;
+    font-weight: 500;
+    color: var(--primary-dark);
+    display: block;
+}
+.summary-label {
+    font-size: 0.9em;
+    color: var(--secondary-text-color);
+}
+/* Parameter Filter Button Styles */
+.param-filter-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+.param-filter-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--text-color);
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+.param-filter-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+.param-filter-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+/* Range Slider Styles */
+.range-slider-container {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+.range-slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.range-slider-header label {
+    font-weight: 500;
+    color: var(--secondary-text-color);
+    margin: 0;
+}
+.range-slider-values {
+    font-weight: 500;
+    color: var(--primary-dark);
+}
+.slider-wrapper {
+    position: relative;
+    height: 20px;
+}
+.slider-track, .slider-highlight {
+    position: absolute;
+    height: 4px;
+    border-radius: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+}
+.slider-track {
+    background-color: var(--divider-color);
+    z-index: 1;
+}
+.slider-highlight {
+    background-color: var(--primary-color);
+    z-index: 2;
+}
+.slider-wrapper input[type=range] {
+    position: absolute;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    pointer-events: none;
+    z-index: 3;
+    margin: 0;
+}
+.slider-wrapper input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    cursor: pointer;
+    border-radius: 50%;
+    pointer-events: auto;
+    border: 3px solid white;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+}
 
-        .selector-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
+/* Header styles */
+.header {
+    background: var(--card-background);
+    color: var(--text-color);
+    padding: 32px 24px;
+    margin-bottom: 24px;
+    border-radius: 8px;
+    border: 1px solid var(--divider-color);
+    position: relative;
+    overflow: hidden;
+}
 
-        .selector-header h4 {
-            margin: 0;
-            color: var(--primary-dark);
-            font-size: 1.1em;
-        }
+.header::before, .header::after {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.2;
+}
 
-        .reset-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.5em;
-            opacity: 0.6;
-            transition: all 0.2s ease;
-            padding: 0;
-        }
+.header::before {
+    background: radial-gradient(circle, var(--primary-light), transparent 70%);
+    width: 300px;
+    height: 300px;
+    top: -120px;
+    left: -120px;
+}
 
-        .reset-btn:hover {
-            opacity: 1;
-            transform: rotate(180deg);
-        }
+.header::after {
+    background: radial-gradient(circle, var(--primary-color), transparent 70%);
+    width: 250px;
+    height: 250px;
+    bottom: -120px;
+    right: -80px;
+}
 
-        .model-selector h4 {
-            margin-top: 0;
-            margin-bottom: 12px;
-            color: var(--primary-dark);
-            font-size: 1.1em;
-        }
+.header-content {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    text-align: left;
+}
 
-        .model-checkbox-list {
-            max-height: 400px;
-            overflow-y: auto;
-            padding-right: 8px;
-        }
+.header-text {
+    width: 100%;
+}
 
-        .model-checkbox-list label {
-            display: block;
-            margin-bottom: 8px;
-            cursor: pointer;
-            padding: 10px 14px;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
+.header h1 {
+    color: var(--text-color);
+    font-size: 3em;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    text-shadow: none;
+    animation: slideInFromLeft 0.8s ease-out;
+    text-align: left;
+}
 
-        .model-checkbox-list label:hover {
-            background-color: rgba(25, 118, 210, 0.08);
-            transform: translateX(4px);
-        }
+.header-subtitle {
+    font-size: 1.1em;
+    font-weight: 400;
+    color: var(--secondary-text-color);
+    max-width: none;
+    line-height: 1.6;
+    animation: slideInFromLeft 0.8s ease-out 0.2s both;
+    background: none;
+    backdrop-filter: none;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+}
 
-        .model-checkbox-list input[type="checkbox"] {
-            -webkit-appearance: none;
-            appearance: none;
-            background-color: #fff;
-            margin-right: 12px;
-            font: inherit;
-            color: currentColor;
-            width: 1.2em;
-            height: 1.2em;
-            border: 0.15em solid currentColor;
-            border-radius: 0.3em;
-            transform: translateY(-0.075em);
-            display: grid;
-            place-content: center;
-            opacity: 0.5;
-            transition: all 0.1s ease-in-out;
-        }
+.header-subtitle a {
+     color: var(--primary-color);
+     text-decoration: none;
+     font-weight: 500;
+     border-bottom: 1px solid transparent;
+     transition: all 0.3s ease;
+}
 
-        .model-checkbox-list input[type="checkbox"]::before {
-            content: "";
-            width: 0.7em;
-            height: 0.7em;
-            transform: scale(0);
-            transition: 120ms transform ease-in-out;
-            box-shadow: inset 1em 1em var(--primary-color);
-            transform-origin: bottom left;
-            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-        }
+.header-subtitle a:hover {
+    color: var(--primary-dark);
+    border-bottom-color: var(--primary-dark);
+}
 
-        .model-checkbox-list input[type="checkbox"]:checked {
-            opacity: 1;
-            border-color: var(--primary-color);
-        }
-        
-        .model-checkbox-list input[type="checkbox"]:checked::before {
-            transform: scale(1);
-        }
-        
-        .model-checkbox-list input[type="checkbox"]:hover {
-            opacity: 1;
-        }
-        
-        .chart-display-container {
-            flex: 3;
-            min-width: 400px;
-        }
-        
-        .view-switcher {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-            align-self: flex-start;
-        }
-        
-        .view-toggle-btn {
-            padding: 8px 16px;
-            border: 1px solid var(--divider-color);
-            border-radius: 6px;
-            cursor: pointer;
-            background-color: transparent;
-            color: var(--secondary-text-color);
-            font-weight: 500;
-            transition: all 0.2s ease-in-out;
-        }
-        
-        .view-toggle-btn:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-        
-        .view-toggle-btn.active {
-            background-color: var(--primary-light);
-            color: white;
-            border-color: var(--primary-light);
-        }
-        
-        .chart-view {
-            display: none;
-        }
-        
-        .chart-view.active {
-            display: block;
-        }
-        
-        .radar-chart {
-            flex: 3;
-            min-width: 400px;
-        }
+.header-stats {
+    display: flex;
+    gap: 16px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-start;
+    animation: slideInFromRight 0.8s ease-out 0.4s both;
+    margin-top: 24px;
+}
 
-        .chart-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            margin-top: 20px;
-            padding: 16px;
-            background: #f9f9f9;
-            border-radius: 8px;
-        }
+.stat-item {
+    background: #fdfdfd;
+    border: 1px solid var(--divider-color);
+    padding: 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.3s ease;
+    flex-grow: 1;
+    min-width: 250px;
+    cursor: default;
+    box-sizing: border-box;
+}
 
-        .chart-control-explanation {
-            font-size: 0.9em;
-            color: var(--secondary-text-color);
-            margin: -10px 0 10px 15px;
-        }
+.stat-item:hover {
+     transform: translateY(-2px);
+     border-color: #ddd;
+     box-shadow: var(--shadow-1);
+}
 
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        
-        .control-group strong {
-            font-weight: 500;
-            color: var(--secondary-text-color);
-        }
+.stat-item.highlight {
+    background: #fff5f2;
+    border-color: var(--primary-light);
+    box-shadow: none;
+}
 
-        /* Toggle Switch for Difference Mode */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 28px;
-        }
-        .switch input { display: none; }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 28px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: var(--primary-color);
-        }
-        input:checked + .slider:before {
-            transform: translateX(22px);
-        }
+.stat-icon {
+    font-size: 1.8em;
+    line-height: 1;
+    color: var(--primary-color);
+    background: #f0f0f0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
 
-        #baselineModelSelector {
-            padding: 6px 10px;
-            border-radius: 6px;
-            border: 1px solid var(--divider-color);
-        }
+.stat-item.highlight .stat-icon {
+    color: white;
+    background: var(--primary-color);
+}
 
-        .category-toggles label {
-            display: inline-flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .category-toggles input {
-             margin-right: 6px;
-        }
+.stat-text {
+    text-align: left;
+}
 
-        @media (max-width: 900px) {
-            .comparison-container {
-                flex-direction: column;
-            }
+.stat-value {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
 
-            .model-selector {
-                max-width: 100%;
-                max-height: 250px;
-            }
-        }
+.stat-label {
+    font-size: 0.75em;
+    color: var(--secondary-text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timestamp {
+    text-align: center;
+    margin-top: 32px;
+    font-style: italic;
+    color: var(--secondary-text-color);
+    font-size: 0.9em;
+    position: relative;
+    z-index: 1;
+    display: block;
+    gap: 0;
+    justify-content: center;
+}
+
+.timestamp::before {
+    content: none;
+}
+
+/* Animations */
+@keyframes slideInFromLeft {
+    from { opacity: 0; transform: translateX(-30px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInFromRight {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Responsive header */
+@media (max-width: 900px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+    .header-stats {
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 32px;
+        justify-content: flex-start;
+    }
+    .stat-item {
+        width: auto;
+        flex-grow: 1;
+        min-width: 250px;
+    }
+     .header h1 {
+        font-size: 2.5em;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 32px 16px 24px 16px;
+    }
+
+    .header h1 {
+        font-size: 2.2em;
+    }
+
+    .header-subtitle {
+        font-size: 1em;
+    }
+
+    .header-stats {
+        gap: 12px;
+        flex-direction: column;
+    }
+
+    .stat-item {
+        padding: 12px 16px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+/* Model Comparison Section */
+.comparison-container {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.model-selector {
+    flex: 1;
+    min-width: 250px;
+    max-width: 300px;
+    background-color: var(--card-background);
+    padding: 16px;
+    border-radius: 4px;
+    align-self: flex-start;
+    border: 1px solid var(--divider-color);
+    box-shadow: var(--shadow-1);
+}
+
+.selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.selector-header h4 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1.1em;
+}
+
+.reset-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5em;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.reset-btn:hover {
+    opacity: 1;
+    transform: rotate(180deg);
+}
+
+.model-selector h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: var(--text-color);
+    font-size: 1.1em;
+}
+
+.model-checkbox-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.model-checkbox-list label {
+    display: block;
+    margin-bottom: 4px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.model-checkbox-list label:hover {
+    background-color: rgba(255, 62, 0, 0.08);
+}
+
+.model-checkbox-list label.disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.model-checkbox-list label.disabled:hover {
+    background-color: transparent;
+}
+
+.model-checkbox-list input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: #fff;
+    margin-right: 12px;
+    font: inherit;
+    color: var(--secondary-text-color);
+    width: 1.2em;
+    height: 1.2em;
+    border: 0.15em solid currentColor;
+    border-radius: 0.15em;
+    transform: translateY(-0.075em);
+    display: grid;
+    place-content: center;
+    transition: all 0.1s ease-in-out;
+}
+
+.model-checkbox-list input[type="checkbox"]::before {
+    content: "";
+    width: 0.65em;
+    height: 0.65em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em var(--primary-color);
+    transform-origin: bottom left;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.model-checkbox-list input[type="checkbox"]:checked {
+    border-color: var(--primary-color);
+}
+
+.model-checkbox-list input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+.model-checkbox-list input[type="checkbox"]:hover {
+    color: var(--primary-color);
+}
+
+.chart-display-container {
+    flex: 3;
+    min-width: 400px;
+}
+
+.view-switcher {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-self: flex-start;
+}
+
+.view-toggle-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--divider-color);
+    border-radius: 6px;
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--secondary-text-color);
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+.view-toggle-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.view-toggle-btn.active {
+    background-color: var(--primary-light);
+    color: white;
+    border-color: var(--primary-light);
+}
+
+.chart-view {
+    display: none;
+}
+
+.chart-view.active {
+    display: block;
+}
+
+.radar-chart {
+    flex: 3;
+    min-width: 400px;
+}
+
+.chart-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 20px;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
+.chart-control-explanation {
+    font-size: 0.9em;
+    color: var(--secondary-text-color);
+    margin: -10px 0 10px 15px;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.control-group strong {
+    font-weight: 500;
+    color: var(--secondary-text-color);
+}
+
+/* Toggle Switch for Difference Mode */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+.switch input { display: none; }
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 28px;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+#baselineModelSelector {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--divider-color);
+    background-color: white;
+}
+
+.category-toggles label {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.category-toggles input {
+     margin-right: 6px;
+}
+
+@media (max-width: 900px) {
+    .comparison-container {
+        flex-direction: column;
+    }
+
+    .model-selector {
+        max-width: 100%;
+        max-height: 250px;
+    }
+}
+
+
+
+
+.tooltip-trigger {
+    border-bottom: 1px dotted var(--secondary-text-color);
+    cursor: help;
+}
+
+.score-tooltip {
+    position: absolute;
+    background: var(--card-background);
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    padding: 12px;
+    box-shadow: var(--shadow-2);
+    z-index: 1000;
+    pointer-events: none;
+    display: none;
+    max-width: 300px;
+    font-size: 0.9em;
+}
+
+.score-tooltip h4 {
+    margin: 0 0 8px 0;
+    color: var(--primary-color);
+    font-size: 1.1em;
+}
+
+.score-tooltip ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.score-tooltip li {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.score-tooltip .label {
+    color: var(--secondary-text-color);
+    margin-right: 10px;
+}
+
+.score-tooltip .value {
+    font-weight: 500;
+}
+
+#backToTopBtn {
+    display: none;
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 1000;
+    border: none;
+    outline: none;
+    background-color: var(--primary-color);
+    color: white;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    box-shadow: var(--shadow-2);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#backToTopBtn:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
     </style>
 </head>
 <body>
+    <button onclick="scrollToTop()" id="backToTopBtn" title="Go to top">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+    </button>
     <div class="container">
         <div class="header">
             <div class="header-content">
-                <h1>{{ report_title }}</h1>
-                <p class="header-subtitle">{{ intro_text }}</p>
+                <div class="header-text">
+                    <h1>{{ report_title }}</h1>
+                    <p class="header-subtitle">{{ intro_text }}</p>
+                </div>
                 <div class="header-stats">
                     <div class="stat-item">
-                        <div class="stat-value">{{ leaderboard_data | length }}</div>
-                        <div class="stat-label">Total Models</div>
+                        <div class="stat-icon">🤖</div>
+                        <div class="stat-text">
+                            <div class="stat-value">{{ leaderboard_data | length }}</div>
+                            <div class="stat-label">Total Models</div>
+                        </div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">{{ summary_data.top_model_by_cost }}</div>
-                        <div class="stat-label">Best Cost-Efficiency</div>
+                         <div class="stat-icon">💡</div>
+                        <div class="stat-text">
+                            <div class="stat-value">{{ summary_data.top_model_by_cost }}</div>
+                            <div class="stat-label">Best Cost-Efficiency</div>
+                        </div>
                     </div>
                     <div class="stat-item highlight">
-                        <div class="stat-value">{{ summary_data.top_model_by_score }}</div>
-                        <div class="stat-label">Highest Overall Score</div>
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-text">
+                            <div class="stat-value">{{ summary_data.top_model_by_score }}</div>
+                            <div class="stat-label">Highest Score</div>
+                        </div>
                     </div>
                 </div>
-                <p class="timestamp">Generated on: {{ timestamp }}</p>
             </div>
+            <p class="timestamp">Generated on: {{ timestamp }}</p>
         </div>
 
         <div class="card">
@@ -1050,6 +1192,9 @@
                         <button class="param-filter-btn" data-min="7" data-max="15">7-15B</button>
                         <button class="param-filter-btn" data-min="15" data-max="70">15-70B</button>
                         <button class="param-filter-btn" data-min="70" data-max="{{max_param}}">&gt; 70B</button>
+                        <button class="param-filter-btn" data-min="70" data-max="120">70-120B</button>
+                        <button class="param-filter-btn" data-min="120" data-max="800"> 120-800B</button>
+                        <button class="param-filter-btn" data-min="800" data-max="{{max_param}}">&gt; 800B</button>
                     </div>
                     <div class="slider-wrapper">
                         <div class="slider-track"></div>
@@ -1076,9 +1221,17 @@
                         {% for row in leaderboard_data %}
                         <tr>
                             {% for header in leaderboard_headers %}
-                                <td class="col-{{ header }}">
+                                <td class="col-{{ header }}"
                                     {% if header == 'final_score' and row[header] %}
-                                        {{ '%.2f' | format(row[header] | float) }}
+                                        data-model-name="{{ row.model_name }}"
+                                        data-final-score="{{ row.final_score | float | round(2) }}"
+                                        data-entity-score="{{ row.entity_score | float | round(2) }}"
+                                        data-dev-score="{{ row.dev_score | float | round(2) }}"
+                                        data-community-score="{{ row.community_score | float | round(2) }}"
+                                        data-technical-score="{{ row.technical_score | float | round(2) }}"
+                                    {% endif %}>
+                                    {% if header == 'final_score' and row[header] %}
+                                        <span class="tooltip-trigger">{{ '%.2f' | format(row[header] | float) }}</span>
                                     {% else %}
                                         {{ row[header] }}
                                     {% endif %}
@@ -1114,7 +1267,52 @@
                     <h2>Cost-Efficiency Leaderboard</h2>
                     <p>This leaderboard ranks models by their cost-efficiency, calculated as <strong>Final Score / Total Price (Input + Output USD/Mtok)</strong>. Higher values are better.</p>
                     {% if cost_efficiency_data %}
-                        <table class="leaderboard-table">
+                        <div class="leaderboard-summary">
+                            <div class="summary-item">
+                                <span class="summary-value">{{ cost_efficiency_data | length }}</span>
+                                <span class="summary-label">Total Models</span>
+                            </div>
+                            <div class="summary-item">
+                                <span id="costDisplayedModelsCount" class="summary-value">0</span>
+                                <span class="summary-label">Displayed Models</span>
+                            </div>
+                        </div>
+
+                        <div class="column-toggle-container">
+                             <div class="arch-filter-container" id="costArchFilterContainer">
+                                <button class="arch-filter-btn active" data-filter="all">All</button>
+                                <button class="arch-filter-btn" data-filter="dense">Dense</button>
+                                <button class="arch-filter-btn" data-filter="moe">MOE</button>
+                            </div>
+                            <input type="search" id="costModelSearchInput" placeholder="Search for models...">
+                        </div>
+                        
+                        <div class="range-slider-container" id="costParamRangeSlider">
+                            <div class="range-slider-header">
+                                <label>Filter by Parameter Count (Billions):</label>
+                                <div class="range-slider-values">
+                                    <span id="costMinParamValue">{{ min_param }}</span>B - <span id="costMaxParamValue">{{ max_param }}</span>B
+                                </div>
+                            </div>
+                            <div class="param-filter-container" id="costParamFilterContainer">
+                                <button class="param-filter-btn active" data-min="{{min_param}}" data-max="{{max_param}}">All</button>
+                                <button class="param-filter-btn" data-min="0" data-max="7">&lt; 7B</button>
+                                <button class="param-filter-btn" data-min="7" data-max="15">7-15B</button>
+                                <button class="param-filter-btn" data-min="15" data-max="70">15-70B</button>
+                                <button class="param-filter-btn" data-min="70" data-max="{{max_param}}">&gt; 70B</button>
+                                <button class="param-filter-btn" data-min="70" data-max="120">70-120B</button>
+                                <button class="param-filter-btn" data-min="120" data-max="800">120-800B</button>
+                                <button class="param-filter-btn" data-min="800" data-max="{{max_param}}">&gt; 800B</button>
+                            </div>
+                            <div class="slider-wrapper">
+                                <div class="slider-track"></div>
+                                <div class="slider-highlight" id="costSliderHighlight"></div>
+                                <input type="range" id="costMinParam" min="{{min_param}}" max="{{max_param}}" value="{{min_param}}">
+                                <input type="range" id="costMaxParam" min="{{min_param}}" max="{{max_param}}" value="{{max_param}}">
+                            </div>
+                        </div>
+
+                        <table class="leaderboard-table" id="costEfficiencyTable">
                             <thead>
                                 <tr>
                                     <th>Model Name</th>
@@ -1126,7 +1324,7 @@
                             </thead>
                             <tbody>
                                 {% for model in cost_efficiency_data %}
-                                <tr>
+                                <tr data-param-count="{{ model.param_count }}" data-arch="{{ model.architecture }}">
                                     <td>{{ model.model_name }}</td>
                                     <td><strong>{{ model.cost_efficiency }}</strong></td>
                                     <td>{{ '%.2f' | format(model.final_score | float) }}</td>
@@ -1204,6 +1402,24 @@
         </div>
     </div>
 <script>
+    const backToTopBtn = document.getElementById("backToTopBtn");
+
+    window.onscroll = function() {
+        scrollFunction();
+    };
+
+    function scrollFunction() {
+        if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+            backToTopBtn.style.display = "block";
+        } else {
+            backToTopBtn.style.display = "none";
+        }
+    }
+
+    function scrollToTop() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
     function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
         
@@ -1239,10 +1455,52 @@
 
     // Set default tab to be open on page load
     document.addEventListener("DOMContentLoaded", function() {
+        const scoreTooltip = document.getElementById('scoreTooltip');
+        const leaderboardTable = document.getElementById('leaderboardTable');
+
+        if (leaderboardTable && scoreTooltip) {
+            leaderboardTable.addEventListener('mouseover', function(e) {
+                const cell = e.target.closest('.col-final_score');
+                if (cell && cell.dataset.modelName) {
+                    const modelData = {
+                        model_name: cell.dataset.modelName,
+                        final_score: parseFloat(cell.dataset.finalScore),
+                        entity_score: parseFloat(cell.dataset.entityScore),
+                        dev_score: parseFloat(cell.dataset.devScore),
+                        community_score: parseFloat(cell.dataset.communityScore),
+                        technical_score: parseFloat(cell.dataset.technicalScore)
+                    };
+                    
+                    let content = `<h4>${modelData.model_name} Score Breakdown</h4>`;
+                    content += '<ul>';
+                    content += `<li><span class="label">Final Score:</span> <span class="value">${modelData.final_score.toFixed(2)}</span></li>`;
+                    content += `<li><span class="label">Entity Score:</span> <span class="value">${modelData.entity_score.toFixed(2)}</span></li>`;
+                    content += `<li><span class="label">Dev Score:</span> <span class="value">${modelData.dev_score.toFixed(2)}</span></li>`;
+                    content += `<li><span class="label">Community Score:</span> <span class="value">${modelData.community_score.toFixed(2)}</span></li>`;
+                    content += `<li><span class="label">Technical Score:</span> <span class="value">${modelData.technical_score.toFixed(2)}</span></li>`;
+                    content += '</ul>';
+                    
+                    scoreTooltip.innerHTML = content;
+                    scoreTooltip.style.display = 'block';
+                    
+                    const x = e.pageX + 10;
+                    const y = e.pageY + 10;
+                    scoreTooltip.style.left = `${x}px`;
+                    scoreTooltip.style.top = `${y}px`;
+                }
+            });
+
+            leaderboardTable.addEventListener('mouseout', function(e) {
+                const cell = e.target.closest('.col-final_score');
+                if (cell) {
+                    scoreTooltip.style.display = 'none';
+                }
+            });
+        }
+
         // Click the first tab link to open it
         document.getElementsByClassName("tab-links")[0].click();
         
-        const leaderboardTable = document.getElementById("leaderboardTable");
         if (leaderboardTable) {
             // Default sort on page load
             const defaultSortCol = leaderboardTable.dataset.defaultSortCol;
@@ -1274,7 +1532,7 @@
         });
 
         function setDefaultColumns() {
-            const leaderboardTable = document.getElementById('leaderboardTable');
+            if (!leaderboardTable) return;
             const defaultVisibleJSON = leaderboardTable.dataset.defaultVisibleCols;
             const defaultVisible = JSON.parse(defaultVisibleJSON || '[]');
 
@@ -1416,6 +1674,8 @@
         // Initial setup on page load
         setDefaultColumns();
         filterTable(); // Also runs initial model count
+        setupCostEfficiencyFilters(); // Setup for the new cost efficiency tab
+        filterCostTable(); // Initial filter for cost table
 
         // Radar chart logic
         const radarModelSelector = document.getElementById('radarModelSelector');
@@ -1430,26 +1690,35 @@
 
         if (radarModelSelector) {
             const checkboxes = radarModelSelector.querySelectorAll('.radar-checkbox');
+            
+            function manageCheckboxState() {
+                const selectedCount = Array.from(checkboxes).filter(i => i.checked).length;
+                const limitReached = selectedCount >= 5;
+                checkboxes.forEach(cb => {
+                    if (!cb.checked) {
+                        cb.disabled = limitReached;
+                    }
+                    cb.parentElement.classList.toggle('disabled', cb.disabled);
+                });
+            }
+
             checkboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', () => {
-                    let selectedModels = Array.from(checkboxes)
-                                             .filter(i => i.checked)
-                                             .map(i => i.value);
-                    
-                    if (selectedModels.length > 5) {
-                        alert("You can select a maximum of 5 models for comparison.");
-                        checkbox.checked = false;
-                        return;
-                    }
-                    
+                    manageCheckboxState();
                     updateComparisonCharts();
                 });
             });
 
             const resetRadarBtn = document.getElementById('resetRadarBtn');
             if (resetRadarBtn) {
-                resetRadarBtn.addEventListener('click', resetRadarToDefault);
+                resetRadarBtn.addEventListener('click', () => {
+                    resetRadarToDefault(); // This calls updateComparisonCharts
+                    manageCheckboxState(); // Just update the disabled state
+                });
             }
+            
+            // Initial state on load
+            manageCheckboxState();
         }
 
         // Event listeners for comparison chart controls
@@ -1490,6 +1759,142 @@
         // Initialize the default comparison chart on page load
         updateComparisonCharts();
     });
+
+    function setupCostEfficiencyFilters() {
+        // Search logic
+        const searchInput = document.getElementById('costModelSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                setTimeout(() => filterCostTable(), 300);
+            });
+        }
+
+        // Arch filter logic
+        const archFilterContainer = document.getElementById('costArchFilterContainer');
+        if (archFilterContainer) {
+            archFilterContainer.addEventListener('click', (event) => {
+                if (event.target.classList.contains('arch-filter-btn')) {
+                    archFilterContainer.querySelector('.active').classList.remove('active');
+                    event.target.classList.add('active');
+                    filterCostTable();
+                }
+            });
+        }
+
+        // Parameter preset filter logic
+        const paramFilterContainer = document.getElementById('costParamFilterContainer');
+        const minParamSlider = document.getElementById('costMinParam');
+        const maxParamSlider = document.getElementById('costMaxParam');
+        
+        if (paramFilterContainer) {
+            paramFilterContainer.addEventListener('click', (event) => {
+                if (event.target.classList.contains('param-filter-btn')) {
+                    const button = event.target;
+                    minParamSlider.value = button.dataset.min;
+                    maxParamSlider.value = button.dataset.max;
+                    
+                    paramFilterContainer.querySelector('.active')?.classList.remove('active');
+                    button.classList.add('active');
+                    
+                    updateCostSliderAppearance();
+                    filterCostTable();
+                }
+            });
+        }
+
+        // Range slider logic
+        if (minParamSlider && maxParamSlider) {
+            minParamSlider.addEventListener('input', () => {
+                if (parseInt(minParamSlider.value) > parseInt(maxParamSlider.value)) {
+                    maxParamSlider.value = minParamSlider.value;
+                }
+                paramFilterContainer.querySelector('.active')?.classList.remove('active');
+                updateCostSliderAppearance();
+                filterCostTable();
+            });
+
+            maxParamSlider.addEventListener('input', () => {
+                if (parseInt(maxParamSlider.value) < parseInt(minParamSlider.value)) {
+                    minParamSlider.value = maxParamSlider.value;
+                }
+                paramFilterContainer.querySelector('.active')?.classList.remove('active');
+                updateCostSliderAppearance();
+                filterCostTable();
+            });
+            updateCostSliderAppearance(); // Initial update
+        }
+    }
+
+    function updateCostSliderAppearance() {
+        const minParamSlider = document.getElementById('costMinParam');
+        const maxParamSlider = document.getElementById('costMaxParam');
+        const sliderHighlight = document.getElementById('costSliderHighlight');
+        const minParamValue = document.getElementById('costMinParamValue');
+        const maxParamValue = document.getElementById('costMaxParamValue');
+
+        if (!minParamSlider || !maxParamSlider || !sliderHighlight) return;
+
+        const minVal = parseInt(minParamSlider.value);
+        const maxVal = parseInt(maxParamSlider.value);
+        const minBound = parseInt(minParamSlider.min);
+        const maxBound = parseInt(minParamSlider.max);
+        
+        minParamValue.textContent = minVal;
+        maxParamValue.textContent = maxVal;
+
+        const range = maxBound - minBound;
+        const minPercent = ((minVal - minBound) / range) * 100;
+        const maxPercent = ((maxVal - minBound) / range) * 100;
+        sliderHighlight.style.left = `${minPercent}%`;
+        sliderHighlight.style.width = `${maxPercent - minPercent}%`;
+    }
+
+    function filterCostTable() {
+        const searchTerm = document.getElementById('costModelSearchInput').value.toLowerCase();
+        const minParam = parseInt(document.getElementById('costMinParam').value, 10);
+        const maxParam = parseInt(document.getElementById('costMaxParam').value, 10);
+        const archFilter = document.querySelector('#costArchFilterContainer .arch-filter-btn.active').dataset.filter;
+
+        const table = document.getElementById('costEfficiencyTable');
+        const rows = table.tBodies[0].rows;
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            let isVisible = true;
+
+            const modelName = row.cells[0].textContent.toLowerCase();
+            const paramCount = parseFloat(row.dataset.paramCount);
+            const arch = row.dataset.arch.toLowerCase();
+            
+            if (modelName.indexOf(searchTerm) === -1) {
+                isVisible = false;
+            }
+
+            if (isVisible && (isNaN(paramCount) || paramCount < minParam || paramCount > maxParam)) {
+                isVisible = false;
+            }
+            
+            if (isVisible && archFilter !== 'all' && arch !== archFilter) {
+                isVisible = false;
+            }
+
+            row.style.display = isVisible ? "" : "none";
+        }
+        updateCostDisplayedModelCount();
+    }
+
+    function updateCostDisplayedModelCount() {
+        const table = document.getElementById('costEfficiencyTable');
+        if (!table) return;
+        const rows = table.tBodies[0].rows;
+        let visibleRows = 0;
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].style.display !== 'none') {
+                visibleRows++;
+            }
+        }
+        document.getElementById('costDisplayedModelsCount').textContent = visibleRows;
+    }
 
     function updateDisplayedModelCount() {
         const table = document.getElementById('leaderboardTable');
@@ -1751,5 +2156,6 @@
     }
 
 </script>
+<div id="scoreTooltip" class="score-tooltip"></div>
 </body>
 </html> 
