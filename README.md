@@ -17,7 +17,6 @@
 
 <br>
 
-<<<<<<< ours
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
@@ -37,8 +36,6 @@
 - [Results Data Format](#results-data-format)
 - [License](#license)
 
-||||||| ancestor
-=======
 ## Table of Contents
 
 - [Overview](#overview)
@@ -55,7 +52,6 @@
 - [Results Data Format](#results-data-format)
 - [License](#license)
 
->>>>>>> theirs
 ## Overview
 
 This project provides tools for scoring and comparing large language models based on the following criteria:
@@ -418,7 +414,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
 
 ```json
 {
-<<<<<<< ours
     "entity_benchmarks": {
         "artificial_analysis": 60.22,
         "OpenCompass": 86.7,
@@ -430,7 +425,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
         "EvalPlus Leaderboard": null,
         "Dubesord_LLM": 70.5,
         "Open VLM": null
-||||||| ancestor
     "model_name": "Deepseek-R1",
     "scores": {
         "entity_score": 18.84257142857143,
@@ -440,7 +434,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
         "technical_score": 16.95878387917363,
         "final_score": 75.63,
         "avg_performance": 73.21368421052631
-=======
     "entity_benchmarks": {
         "artificial_analysis": 60.22,
         "OpenCompass": 86.7,
@@ -493,9 +486,7 @@ Results will be stored as JSON files in the `Results` directory, with the follow
         "ChartQA": null,
         "DocVQA": null,
         "AI2D": null
->>>>>>> theirs
     },
-<<<<<<< ours
     "dev_benchmarks": {
         "MMLU": 90.8, 
         "MMLU Pro": 84.0, 
@@ -547,7 +538,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
         "context_window": 128000,
         "param_count": 685,
         "architecture": "moe"
-||||||| ancestor
     "input_data": {
         "entity_benchmarks": {
             "artificial_analysis": 0.6022,
@@ -612,7 +602,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
             "param_count": 685,
             "architecture": "moe"
         }
-=======
     "community_score": {
         "lm_sys_arena_score": 1389,
         "hf_score": 8.79
@@ -623,7 +612,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
         "context_window": 128000,
         "param_count": 685,
         "architecture": "moe"
->>>>>>> theirs
     }
 }
 ```
