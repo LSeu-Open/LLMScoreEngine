@@ -1,0 +1,32 @@
+# Example configuration file for LLM Benchmark Pipeline
+# Save as config.yaml and run: python llm_benchmark_pipeline.py --config config.yaml
+
+# Required settings
+template_path: "GLM-4.6.json"
+output_dir: "./filled_models"
+
+# API Configuration
+artificial_analysis_key: null  # Will use ARTIFICIAL_ANALYSIS_API_KEY env var
+huggingface_key: null          # Will use HUGGINGFACE_API_KEY env var
+
+# Rate limiting (requests per second)
+rate_limit_aa: 1.0
+rate_limit_hf: 0.5
+
+# Retry and timeout configuration
+max_retries: 3
+retry_backoff_factor: 2.0
+timeout: 30
+
+# Processing options
+continue_on_error: true
+
+# Models to process (can also be specified via --models argument)
+models:
+  - name: "GLM-4.6"
+    hf_id: "zai-org/GLM-4.6"
+  - name: "Qwen2.5-72B-Instruct"
+    hf_id: "Qwen/Qwen2.5-72B-Instruct"
+  - name: "Llama-3.1-70B-Instruct"
+    hf_id: "meta-llama/Llama-3.1-70B-Instruct"
+  - name: "GPT-4.5"  # No HF ID for proprietary models
