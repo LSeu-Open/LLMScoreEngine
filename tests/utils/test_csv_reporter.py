@@ -1,40 +1,20 @@
-<<<<<<< ours
-# ------------------------------------------------------------------------------------------------
-# License
-# ------------------------------------------------------------------------------------------------
+"""Tests for the csv_reporter module."""
 
-# Copyright (c) 2025 LSeu-Open
-# 
-# This code is licensed under the MIT License.
-# See LICENSE file in the root directory
+from __future__ import annotations
 
-# ------------------------------------------------------------------------------------------------
-# Description
-# ------------------------------------------------------------------------------------------------
-
-"""
-This module provides unit tests for the csv_reporter module.
-"""
-
-# ------------------------------------------------------------------------------------------------
-# Imports
-# ------------------------------------------------------------------------------------------------
-
-import os
-import json
 import csv
+import json
+from pathlib import Path
+
 import pytest
+
 from model_scoring.utils.csv_reporter import generate_csv_report
 
-# ------------------------------------------------------------------------------------------------
-# Fixtures
-# ------------------------------------------------------------------------------------------------
 
-@pytest.fixture
-def test_environment(tmp_path):
-    """
-    Set up the test environment by creating dummy directories and files.
-    """
+@pytest.fixture()
+def test_environment(tmp_path: Path) -> tuple[Path, Path]:
+    """Create temporary results and model directories with sample data."""
+
     results_dir = tmp_path / "Results"
     models_dir = tmp_path / "Models"
     reports_dir = results_dir / "Reports"
@@ -43,170 +23,65 @@ def test_environment(tmp_path):
     models_dir.mkdir()
     reports_dir.mkdir()
 
-    model1_results = {
+    result_payload = {
         "model_name": "test-model-1",
         "scores": {
-            "entity_score": 1, "dev_score": 2, "community_score": 3, "technical_score": 4, "final_score": 2.5
-        }
+            "entity_score": 1.0,
+            "dev_score": 2.0,
+            "community_score": 3.0,
+            "technical_score": 4.0,
+            "final_score": 2.5,
+        },
     }
-    model1_info = {
+    model_payload = {
         "model_specs": {
-            "param_count": "10B", "architecture": "Transformer", "price": "Free"
+            "param_count": "10B",
+            "architecture": "Transformer",
+            "input_price": 0.001,
+            "output_price": 0.002,
+            "price": "Free",
         }
     }
 
-    with open(results_dir / 'test-model-1_results.json', 'w') as f:
-        json.dump(model1_results, f)
-    with open(models_dir / 'test-model-1.json', 'w') as f:
-        json.dump(model1_info, f)
+    (results_dir / "test-model-1_results.json").write_text(
+        json.dumps(result_payload),
+        encoding="utf-8",
+    )
+    (models_dir / "test-model-1.json").write_text(
+        json.dumps(model_payload),
+        encoding="utf-8",
+    )
 
-    return tmp_path, model1_results, model1_info
+    return results_dir, models_dir
 
-# ------------------------------------------------------------------------------------------------
-# Unit Tests
-# ------------------------------------------------------------------------------------------------
 
-def test_generate_csv_report(test_environment, monkeypatch):
-    """
-    Test the generate_csv_report function for a successful execution.
-    """
-    print("\n--- Testing generate_csv_report (Success) ---")
+def test_generate_csv_report_creates_expected_row(
+    test_environment: tuple[Path, Path],
+) -> None:
+    """Ensure the generated CSV contains the expected single row."""
 
-    # Arrange: Configure the test environment
-    tmp_path, model1_results, model1_info = test_environment
-    monkeypatch.chdir(tmp_path)
-    reports_dir = tmp_path / "Results" / "Reports"
+    results_dir, models_dir = test_environment
 
-    print("Generating CSV report...")
-    # Act: Call the function
-    generate_csv_report()
+    report_path = generate_csv_report(
+        models=["test-model-1"],
+        results_dir=results_dir,
+        models_dir=models_dir,
+    )
 
-    # Assert: Verify the outcome
-    report_files = [f for f in os.listdir(reports_dir) if f.endswith('.csv')]
-    assert len(report_files) == 1, "A single report file should be created."
+    assert report_path.exists()
 
-    report_file_path = reports_dir / report_files[0]
-    with open(report_file_path, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
+    with report_path.open(encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
         rows = list(reader)
-        assert len(rows) == 1, "The report should contain exactly one data row."
-        
-        row = rows[0]
-        assert row['model_name'] == model1_results['model_name']
-        assert row['param_count'] == model1_info['model_specs']['param_count']
-        assert row['architecture'] == model1_info['model_specs']['architecture']
-        assert row['price'] == model1_info['model_specs']['price']
-        assert float(row['entity_score']) == model1_results['scores']['entity_score']
-        assert float(row['dev_score']) == model1_results['scores']['dev_score']
-        assert float(row['community_score']) == model1_results['scores']['community_score']
-        assert float(row['technical_score']) == model1_results['scores']['technical_score']
-        assert float(row['final_score']) == model1_results['scores']['final_score']
 
-    print("✅ CSV report generated successfully with correct data.") 
-|||||||
-=======
-# ------------------------------------------------------------------------------------------------
-# License
-# ------------------------------------------------------------------------------------------------
-
-# Copyright (c) 2025 LSeu-Open
-# 
-# This code is licensed under the MIT License.
-# See LICENSE file in the root directory
-
-# ------------------------------------------------------------------------------------------------
-# Description
-# ------------------------------------------------------------------------------------------------
-
-"""
-This module provides unit tests for the csv_reporter module.
-"""
-
-# ------------------------------------------------------------------------------------------------
-# Imports
-# ------------------------------------------------------------------------------------------------
-
-import os
-import json
-import csv
-import pytest
-from model_scoring.utils.csv_reporter import generate_csv_report
-
-# ------------------------------------------------------------------------------------------------
-# Fixtures
-# ------------------------------------------------------------------------------------------------
-
-@pytest.fixture
-def test_environment(tmp_path):
-    """
-    Set up the test environment by creating dummy directories and files.
-    """
-    results_dir = tmp_path / "Results"
-    models_dir = tmp_path / "Models"
-    reports_dir = results_dir / "Reports"
-
-    results_dir.mkdir()
-    models_dir.mkdir()
-    reports_dir.mkdir()
-
-    model1_results = {
-        "model_name": "test-model-1",
-        "scores": {
-            "entity_score": 1, "dev_score": 2, "community_score": 3, "technical_score": 4, "final_score": 2.5
-        }
-    }
-    model1_info = {
-        "model_specs": {
-            "param_count": "10B", "architecture": "Transformer", "price": "Free"
-        }
-    }
-
-    with open(results_dir / 'test-model-1_results.json', 'w') as f:
-        json.dump(model1_results, f)
-    with open(models_dir / 'test-model-1.json', 'w') as f:
-        json.dump(model1_info, f)
-
-    return tmp_path, model1_results, model1_info
-
-# ------------------------------------------------------------------------------------------------
-# Unit Tests
-# ------------------------------------------------------------------------------------------------
-
-def test_generate_csv_report(test_environment, monkeypatch):
-    """
-    Test the generate_csv_report function for a successful execution.
-    """
-    print("\n--- Testing generate_csv_report (Success) ---")
-
-    # Arrange: Configure the test environment
-    tmp_path, model1_results, model1_info = test_environment
-    monkeypatch.chdir(tmp_path)
-    reports_dir = tmp_path / "Results" / "Reports"
-
-    print("Generating CSV report...")
-    # Act: Call the function
-    generate_csv_report()
-
-    # Assert: Verify the outcome
-    report_files = [f for f in os.listdir(reports_dir) if f.endswith('.csv')]
-    assert len(report_files) == 1, "A single report file should be created."
-
-    report_file_path = reports_dir / report_files[0]
-    with open(report_file_path, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        rows = list(reader)
-        assert len(rows) == 1, "The report should contain exactly one data row."
-        
-        row = rows[0]
-        assert row['model_name'] == model1_results['model_name']
-        assert row['param_count'] == model1_info['model_specs']['param_count']
-        assert row['architecture'] == model1_info['model_specs']['architecture']
-        assert row['price'] == model1_info['model_specs']['price']
-        assert float(row['entity_score']) == model1_results['scores']['entity_score']
-        assert float(row['dev_score']) == model1_results['scores']['dev_score']
-        assert float(row['community_score']) == model1_results['scores']['community_score']
-        assert float(row['technical_score']) == model1_results['scores']['technical_score']
-        assert float(row['final_score']) == model1_results['scores']['final_score']
-
-    print("✅ CSV report generated successfully with correct data.") 
->>>>>>> theirs
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["model_name"] == "test-model-1"
+    assert row["param_count"] == "10B"
+    assert row["architecture"] == "Transformer"
+    assert row["price"] == "Free"
+    assert float(row["entity_score"]) == 1.0
+    assert float(row["dev_score"]) == 2.0
+    assert float(row["community_score"]) == 3.0
+    assert float(row["technical_score"]) == 4.0
+    assert float(row["final_score"]) == 2.5
