@@ -283,7 +283,9 @@ def _score_report_action_handler(**kwargs: Any) -> Dict[str, Any]:
                 "graph reporter dependencies are installed."
             )
         html_result = generate_html_report(
-            template_dir=kwargs.get("template_dir")
+            template_dir=kwargs.get("template_dir"),
+            results_dir=results_dir,
+            output_dir=reports_path,
         )
         html_report = (
             html_result
@@ -294,7 +296,7 @@ def _score_report_action_handler(**kwargs: Any) -> Dict[str, Any]:
     return {
         "reports": {
             "csv": str(csv_report) if csv_report else None,
-            "html": html_report,
+            "html": html_report if html_enabled else None,
         }
     }
 

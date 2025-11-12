@@ -41,7 +41,7 @@ class ReportRow:
     architecture: Optional[str]
     input_price: Optional[float]
     output_price: Optional[float]
-    price: Optional[str]
+    price: Optional[float]
     entity_score: Optional[float]
     dev_score: Optional[float]
     community_score: Optional[float]
@@ -109,13 +109,29 @@ def _build_row(
     model_specs: Mapping[str, Any] = model_payload.get("model_specs", {})
     scores: Mapping[str, Any] = result_payload.get("scores", {})
 
+    input_price = model_specs.get("input_price")
+    output_price = model_specs.get("output_price")
+    price = model_specs.get("price")
+
+    # Derive a combined price when not explicitly provided. Many vendor
+    # configs expose separate prompt (input) and completion (output) costs,
+    # so we use their sum as an aggregate price column for reporting.
+    if price is None:
+        price_components = []
+        if isinstance(input_price, (int, float)):
+            price_components.append(float(input_price))
+        if isinstance(output_price, (int, float)):
+            price_components.append(float(output_price))
+        if price_components:
+            price = float(sum(price_components))
+
     return ReportRow(
         model_name=model_name,
         param_count=model_specs.get("param_count"),
         architecture=model_specs.get("architecture"),
-        input_price=model_specs.get("input_price"),
-        output_price=model_specs.get("output_price"),
-        price=model_specs.get("price"),
+        input_price=input_price,
+        output_price=output_price,
+        price=price,
         entity_score=scores.get("entity_score"),
         dev_score=scores.get("dev_score"),
         community_score=scores.get("community_score"),

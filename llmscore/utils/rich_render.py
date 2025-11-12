@@ -6,11 +6,21 @@ from typing import Any
 
 from rich.console import Console
 
+_CONSOLE: Console | None = None
+
 
 def get_console() -> Console:
-    """Return a shared Rich console instance."""
+    """Return a shared Rich console instance configured for plain output."""
 
-    return Console()
+    global _CONSOLE
+    if _CONSOLE is None:
+        _CONSOLE = Console(
+            soft_wrap=True,
+            color_system=None,
+            markup=False,
+            highlight=False,
+        )
+    return _CONSOLE
 
 
 def render_markdown(markdown: str) -> None:
@@ -26,7 +36,7 @@ def render_panel(content: Any, title: str | None = None) -> None:
     from rich.panel import Panel  # Local import to avoid eager dependency
 
     console = get_console()
-    console.print(Panel.fit(content, title=title))
+    console.print(Panel.fit(content, title=title, border_style=""))
 
 
 __all__ = ["get_console", "render_markdown", "render_panel"]

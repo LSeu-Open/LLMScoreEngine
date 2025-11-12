@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import shlex
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Dict, List, Optional, Sequence, Callable
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -48,6 +50,16 @@ FOLLOW_UP_HINTS: Dict[str, Sequence[Dict[str, str]]] = {
 }
 
 
+ASCII_BANNER = r"""
+██╗     ██╗     ███╗   ███╗  ███████╗ ██████╗ ████████╗ ██████╗  ██████╗   ██████╗ ███╗   ██╗ ██████╗ ██╗███╗   ██╗███████╗
+██║     ██║     ████╗ ████║  ██╔════╝██╔════╝║██╔═══██║██╔══██╗║██╔═════╝ ║██╔════╝████╗  ██║██╔════╝ ██║████╗  ██║██╔════╝  
+██║     ██║     ██╔████╔██║  ███████╗██║     ║██║   ██║██████╔╝║█████╗    ║█████╗  ██╔██╗ ██║██║  ███║██║██╔██╗ ██║█████╗   
+██║     ██║     ██║╚██╔╝██║  ╚════██║██║     ║██║   ██║██╔══██╗║██╔══╝    ║██╔══╝  ██║╚██╗██║██║   ██║██║██║╚██╗██║██╔══╝  
+███████╗███████╗██║ ╚═╝ ██║  ███████║╚██████║║████████║██║  ██║║███████║  ║███████║██║ ╚████║╚██████╔╝██║██║ ╚████║███████╗         
+╚══════╝╚══════╝╚═╝     ╚═╝  ╚══════╝ ╚═════╝╚════════╝╚═╝  ╚═╝╚═══════╝  ╚═══════╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚══════╝  
+"""
+
+
 @dataclass(slots=True)
 class ShellConfig:
     """Configuration for the interactive shell."""
@@ -62,6 +74,7 @@ class ShellConfig:
     session_id: Optional[str] = None
     profile: Optional[str] = None
     palette_recent_limit: int = 20
+    banner: Optional[str] = ASCII_BANNER
 
 
 class ShellRuntime:
@@ -130,15 +143,15 @@ class ShellRuntime:
 
         @bindings.add("c-t")
         def _(event) -> None:  # type: ignore[override]
-            event.app.run_in_terminal(self.toggle_timeline)
+            run_in_terminal(self.toggle_timeline)
 
         @bindings.add("c-c")
         def _(event) -> None:  # type: ignore[override]
-            event.app.run_in_terminal(self.toggle_context)
+            run_in_terminal(self.toggle_context)
 
         @bindings.add("c-k")
         def _(event) -> None:  # type: ignore[override]
-            event.app.run_in_terminal(partial(self._open_palette, ""))
+            run_in_terminal(partial(self._open_palette, ""))
 
         return bindings
 
@@ -146,7 +159,10 @@ class ShellRuntime:
     # Rendering helpers
     # ------------------------------------------------------------------
     def _render_intro(self) -> None:
-        self.console.rule("[bold cyan]llmscore shell")
+        if self.config.banner:
+            self.console.print(self.config.banner, style="bold cyan")
+            self.console.print()
+        self.console.rule("llmscore shell")
         self.console.print(self.config.intro_message)
         self.console.print("Type 'help' to see available commands.\n")
         self._render_status()
@@ -274,7 +290,7 @@ class ShellRuntime:
     def toggle_timeline(self) -> None:
         self.timeline_visible = not self.timeline_visible
         state = "shown" if self.timeline_visible else "hidden"
-        self.console.print(f"[cyan]Timeline pane {state}.[/]")
+        self.console.print(f"Timeline pane {state}.")
         self._render_status()
         if self.timeline_visible:
             self._render_timeline_snapshot()
@@ -282,7 +298,7 @@ class ShellRuntime:
     def toggle_context(self) -> None:
         self.context_visible = not self.context_visible
         state = "shown" if self.context_visible else "hidden"
-        self.console.print(f"[cyan]Context pane {state}.[/]")
+        self.console.print(f"Context pane {state}.")
         self._render_status()
         if self.context_visible:
             self._render_context()
@@ -310,7 +326,7 @@ class ShellRuntime:
         try:
             definition = self.action_registry.get(name)
         except KeyError:
-            self.console.print(f"[red]Unknown action:[/] {name}")
+            self.console.print(f"Unknown action: {name}")
             return
 
         table = Table(title=f"Action: {definition.metadata.name}")
@@ -342,12 +358,13 @@ class ShellRuntime:
             self.timeline_events = self.timeline_events[-50:]
         if not self.timeline_visible:
             return
-        style = {
-            "error": "[red]",
-            "warning": "[yellow]",
-            "progress": "[green]",
-        }.get(event.kind, "[cyan]")
-        self.console.print(f"{style}{event.message}[/]")
+        label = {
+            "error": "ERROR",
+            "warning": "WARNING",
+            "progress": "PROGRESS",
+        }.get(event.kind, "INFO")
+        timestamp = event.timestamp.strftime("%H:%M:%S")
+        self.console.print(f"[{timestamp}] {label:<8} {event.message}")
 
     # ------------------------------------------------------------------
     # Main loop
@@ -418,6 +435,12 @@ class ShellRuntime:
                     _, _, remainder = command.partition(" ")
                     self._open_palette(remainder)
                     continue
+                action_name, _, arg_text = command.partition(" ")
+                action_name = action_name.strip()
+                if action_name and action_name in self.action_registry:
+                    inputs = self._parse_action_arguments(action_name, arg_text)
+                    self._execute_action(action_name, inputs=inputs)
+                    continue
                 if command == "suggest":
                     self._render_suggestions()
                     continue
@@ -434,7 +457,7 @@ class ShellRuntime:
                     continue
 
                 warning = (
-                    f"[yellow]Unrecognized command:[/] {command}. "
+                    f"Unrecognized command: {command}. "
                     "Type 'help' for assistance."
                 )
                 self.console.print(warning)
@@ -450,8 +473,14 @@ class ShellRuntime:
     ) -> None:
         action_name = action.strip()
         if not action_name:
-            self.console.print("[yellow]Usage: run <action-name>[/]")
+            self.console.print("Usage: run <action-name>")
             return
+
+        self.console.print()
+        separator = "=" * 72
+        self.console.print(separator)
+        self.console.print(f"Running action: {action_name}")
+        self.console.print(separator)
         try:
             result = self.action_registry.run(
                 action_name,
@@ -459,9 +488,9 @@ class ShellRuntime:
                 controller=self.controller,
             )
         except KeyError:
-            self.console.print(f"[red]Unknown action:[/] {action_name}")
+            self.console.print(f"Unknown action: {action_name}")
         except ActionExecutionError as exc:
-            self.console.print(f"[red]{exc}[/]")
+            self.console.print(f"Action error: {exc}")
             self.suggestions.add_hint(
                 command=f"help action {action_name}",
                 title=f"Read docs for {action_name}",
@@ -470,28 +499,87 @@ class ShellRuntime:
             )
         else:
             self.console.print(
-                f"[green]Action '{action_name}' completed in "
-                f"{result.duration:.2f}s.[/]"
+                f"Action '{action_name}' completed in {result.duration:.2f}s."
             )
             if result.output is not None:
-                self.console.print(f"[green]Output:[/] {result.output}")
+                self.console.print(f"Output: {result.output}")
+            self.console.print("-" * 72)
             self.palette.record_usage(action_name)
             self.suggestions.record_action(action_name)
             self._enqueue_followups(action_name)
 
+    def _parse_action_arguments(
+        self,
+        action_name: str,
+        raw_args: str,
+    ) -> Dict[str, Any]:
+        """Parse positional and key=value pairs for direct action calls."""
+
+        inputs: Dict[str, Any] = {}
+        definition = self.action_registry.get(action_name)
+        text = raw_args.strip()
+        if not text:
+            return inputs
+
+        try:
+            tokens = shlex.split(text)
+        except ValueError as exc:
+            self.console.print(f"Failed to parse arguments: {exc}")
+            return inputs
+
+        positional: List[str] = []
+        for token in tokens:
+            if "=" in token:
+                key, value = token.split("=", 1)
+                inputs[key] = value
+            else:
+                positional.append(token)
+
+        if positional:
+            assigned = False
+            if definition.input_schema:
+                # Prefer explicit required fields
+                for field_name, field_schema in definition.input_schema.items():
+                    if field_name in inputs:
+                        continue
+                    default = (
+                        field_schema.get("default")
+                        if isinstance(field_schema, dict)
+                        else None
+                    )
+                    if default is None:
+                        inputs[field_name] = positional[0]
+                        assigned = True
+                        break
+                if not assigned and "model" in definition.input_schema and "model" not in inputs:
+                    inputs["model"] = positional[0]
+                    assigned = True
+            if assigned and len(positional) > 1:
+                extras = " ".join(positional[1:])
+                self.console.print(
+                    f"Ignoring extra positional arguments: {extras}"
+                )
+            if not assigned:
+                self.console.print(
+                    f"Could not map positional arguments to inputs for '{action_name}'. "
+                    "Use key=value pairs (e.g. model=Name)."
+                )
+
+        return inputs
+
     def _run_wizard(self, action: str) -> None:
         action_name = action.strip()
         if not action_name:
-            self.console.print("[yellow]Usage: wizard <action-name>[/]")
+            self.console.print("Usage: wizard <action-name>")
             return
         try:
             definition = self.action_registry.get(action_name)
         except KeyError:
-            self.console.print(f"[red]Unknown action:[/] {action_name}")
+            self.console.print(f"Unknown action: {action_name}")
             return
         if not definition.input_schema:
             self.console.print(
-                "[yellow]Action has no input schema; use 'run' instead.[/]"
+                "Action has no input schema; use 'run' instead."
             )
             return
 
@@ -523,7 +611,7 @@ class ShellRuntime:
         try:
             result = wizard.run(ask)
         except ValueError as exc:
-            self.console.print(f"[red]{exc}[/]")
+            self.console.print(f"Error: {exc}")
             return
 
         self._execute_action(action_name, inputs=result.data)
@@ -543,7 +631,7 @@ class ShellRuntime:
                 content = self.session.prompt("Scratchpad note> ")
             note = self.scratchpad.add(content, tags=tags)
             self.console.print(
-                f"[green]Saved note {note.identifier[:8]}[/]"
+                f"Saved note {note.identifier[:8]}"
             )
             if self.context_visible:
                 self._render_scratchpad()
@@ -552,25 +640,24 @@ class ShellRuntime:
             identifier = remainder.strip()
             if not identifier:
                 self.console.print(
-                    "[yellow]Usage: scratch remove <note-id>[/]"
+                    "Usage: scratch remove <note-id>"
                 )
                 return
             if self.scratchpad.remove(identifier):
-                self.console.print(f"[green]Removed note {identifier}[/]")
+                self.console.print(f"Removed note {identifier}")
             else:
-                self.console.print(f"[yellow]Note not found:[/] {identifier}")
+                self.console.print(f"Note not found: {identifier}")
             return
         if subcommand == "clear":
             self.scratchpad.clear()
-            self.console.print("[green]Scratchpad cleared.[/]")
+            self.console.print("Scratchpad cleared.")
             return
         if subcommand == "export":
             export = self.scratchpad.export()
             self.console.print(export or "Scratchpad is empty.")
             return
         self.console.print(
-            "[yellow]Unrecognized scratchpad command. "
-            "Use add/show/remove/clear/export.[/]"
+            "Unrecognized scratchpad command. Use add/show/remove/clear/export."
         )
 
     def _split_note_content(self, raw: str) -> tuple[str, Sequence[str]]:
@@ -593,14 +680,14 @@ class ShellRuntime:
     def _branch_session(self, new_session_id: str) -> None:
         if not new_session_id:
             self.console.print(
-                "[yellow]Usage: session branch <new-session-id>[/]"
+                "Usage: session branch <new-session-id>"
             )
             return
         self.session_id = new_session_id
         self.suggestions.bind_session(self.session_id, profile=self.profile)
         self.scratchpad.bind_session(self.session_id, profile=self.profile)
         self.console.print(
-            f"[green]Session context switched to '{self.session_id}'.[/]"
+            f"Session context switched to '{self.session_id}'."
         )
         if self.context_visible:
             self._render_context()
