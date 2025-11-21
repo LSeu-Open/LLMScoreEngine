@@ -512,14 +512,13 @@ class LLMBenchmarkPipeline:
         return value
 
     def _normalize_percentage_sections(self, template: Dict[str, Any], result: Dict[str, Any]) -> None:
-        """Ensure benchmarks filled from APIs are represented on 0-100 scale."""
+        """Ensure all benchmark values adhere to 0-100 percentage scale."""
 
         for section in ('entity_benchmarks', 'dev_benchmarks'):
-            original_section = template.get(section, {}) or {}
             current_section = result.get(section, {}) or {}
 
             for key, value in current_section.items():
-                if original_section.get(key) is None and isinstance(value, (int, float)):
+                if isinstance(value, (int, float)):
                     current_section[key] = self._normalize_percentage_value(value)
 
     def load_template(self, filepath: str) -> Dict:
@@ -636,6 +635,9 @@ class LLMBenchmarkPipeline:
 
         coverage = (total_filled_fields / total_fillable_fields * 100) if total_fillable_fields > 0 else 100.0
         logger.info(f"  Coverage: {coverage:.1f}% ({total_filled_fields}/{total_fillable_fields} fillable fields)")
+
+        if not result['model_specs'].get('architecture'):
+            result['model_specs']['architecture'] = self._normalize_architecture(None)
 
         return result
 

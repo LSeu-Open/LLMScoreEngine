@@ -104,13 +104,17 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     args = parse_args(argv)
     try:
         if args.csv:
-            generate_csv_report()
+            generate_csv_report(
+                models_dir=args.models_dir,
+            )
             print("[*] CSV report generated successfully.")
             return
 
         if args.graph:
             print("[*] Generating HTML graph report...")
-            generate_graph_report()
+            generate_graph_report(
+                results_dir="Results",
+            )
             print("[*] HTML graph report generated successfully.")
             return
 
