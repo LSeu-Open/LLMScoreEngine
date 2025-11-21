@@ -57,6 +57,7 @@ dev_docs/
 *model*mapping*.json
 model_mapping.json
 models_mapping.json
+.github/*
 
 # Documentation (if you want to ignore generated docs)
 # Uncomment if needed:
@@ -71,3 +72,6 @@ Graph_Report.png
 *.log
 tools/fill-benchmark-pipeline/config.yaml
 tools/fill-benchmark-pipeline/.env.example
+
+# GitHub
+.github/workflows/perf-accessibility.yml
