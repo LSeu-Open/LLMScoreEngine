@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Deque, List, Optional
 
 from .events import EventBus, EventKind, OrchestratorEvent
@@ -52,7 +52,7 @@ class TaskController:
             identifier=identifier,
             description=description,
             status="running",
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(UTC),
         )
         self.checkpoints.append(checkpoint)
         self._emit(
@@ -74,7 +74,7 @@ class TaskController:
         if not checkpoint:
             return None
         checkpoint.status = "completed"
-        checkpoint.completed_at = datetime.utcnow()
+        checkpoint.completed_at = datetime.now(UTC)
         checkpoint.error = None
         payload = {
             "id": identifier,
@@ -94,7 +94,7 @@ class TaskController:
         if not checkpoint:
             return None
         checkpoint.status = "failed"
-        checkpoint.completed_at = datetime.utcnow()
+        checkpoint.completed_at = datetime.now(UTC)
         checkpoint.error = str(error)
         self._emit(
             "error",
@@ -137,7 +137,7 @@ class TaskController:
         event = OrchestratorEvent(
             kind=kind,
             message=message,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             payload=payload,
         )
         self.events.append(event)

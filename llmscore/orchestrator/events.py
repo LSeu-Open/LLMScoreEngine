@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, DefaultDict, List, Literal, Mapping, Optional
+from uuid import uuid4
 
 
 EventKind = Literal[
@@ -13,6 +14,13 @@ EventKind = Literal[
     "warning",
     "error",
     "progress",
+]
+
+EventSource = Literal[
+    "system",
+    "action",
+    "controller",
+    "workflow",
 ]
 
 
@@ -24,6 +32,11 @@ class OrchestratorEvent:
     message: str
     timestamp: datetime
     payload: Optional[Mapping[str, Any]] = None
+    source: EventSource = "system"
+    action: Optional[str] = None
+    checkpoint: Optional[str] = None
+    run_id: Optional[str] = None
+    id: str = field(default_factory=lambda: uuid4().hex)
 
 
 EventSubscriber = Callable[[OrchestratorEvent], None]

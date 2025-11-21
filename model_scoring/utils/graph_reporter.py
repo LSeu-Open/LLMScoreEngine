@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import datetime
+from dataclasses import dataclass, field, asdict
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -24,7 +24,9 @@ class SummaryData:
 
     top_model_by_score: str = "N/A"
     model_count: int = 0
-    generated_at: str = datetime.utcnow().isoformat()
+    generated_at: str = field(
+        default_factory=lambda: datetime.now(UTC).isoformat()
+    )
 
 
 def find_latest_csv_report(

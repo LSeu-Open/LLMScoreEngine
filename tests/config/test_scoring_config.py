@@ -90,7 +90,7 @@ def test_technical_score_params():
     print(f"  - TECHNICAL_SCORE_PARAMS type: {type(params).__name__}")
     assert isinstance(params, types.MappingProxyType)
     
-    expected_keys = ['price', 'context_window', 'size_perf_ratio']
+    expected_keys = ['input_price', 'output_price', 'context_window', 'size_perf_ratio']
     are_keys_present = all(key in params for key in expected_keys)
     print(f"  - All expected keys present: {are_keys_present}")
     assert are_keys_present
@@ -101,14 +101,28 @@ def test_technical_score_params():
         params['new_param'] = {}
     print("  - Immutability test passed.")
 
-    # Test nested structure for 'price'
-    price_params = params['price']
-    print(f"  - 'price' params type: {type(price_params).__name__}")
-    assert isinstance(price_params, types.MappingProxyType)
-    price_keys = ['max_points', 'coefficient', 'intercept', 'high_price_cutoff', 'high_price_points']
-    are_price_keys_present = all(key in price_params for key in price_keys)
-    print(f"  - All expected price keys present: {are_price_keys_present}")
-    assert are_price_keys_present
+    # Test nested structure for input and output prices
+    for price_key in ['input_price', 'output_price']:
+        price_params = params[price_key]
+        print(f"  - '{price_key}' params type: {type(price_params).__name__}")
+        assert isinstance(price_params, types.MappingProxyType)
+        price_keys = ['max_points', 'coefficient', 'intercept', 'high_price_cutoff', 'high_price_points']
+        are_price_keys_present = all(key in price_params for key in price_keys)
+        print(f"    - All expected keys present: {are_price_keys_present}")
+        assert are_price_keys_present
+
+    # Test nested structure for context window and size/performance ratio
+    context_params = params['context_window']
+    print(f"  - 'context_window' params type: {type(context_params).__name__}")
+    assert isinstance(context_params, types.MappingProxyType)
+    context_keys = ['max_points', 'coefficient', 'intercept', 'log_base', 'low_cw_cutoff', 'low_cw_points']
+    assert all(key in context_params for key in context_keys)
+
+    size_params = params['size_perf_ratio']
+    print(f"  - 'size_perf_ratio' params type: {type(size_params).__name__}")
+    assert isinstance(size_params, types.MappingProxyType)
+    size_keys = ['max_points', 'base_points', 'scaling_factor', 'size_tiers', 'default_size_factor']
+    assert all(key in size_params for key in size_keys)
 
 def test_model_architecture_factors():
     """Tests the model architecture factors."""

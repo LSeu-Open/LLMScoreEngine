@@ -1,14 +1,15 @@
 # Core dependencies
 typing_extensions>=4.0.0
-argparse>=1.4.0  # for CLI support
-huggingface-hub>=0.20.0  # for Hugging Face model information
-pandas
+argparse>=1.4.0
+huggingface-hub>=0.20.0
+pandas>=2.0.0
 plotly
 Jinja2
 prompt-toolkit>=3.0.0
 rich>=13.0.0
 typer>=0.9.0
 rapidfuzz>=3.0.0
+sqlalchemy>=2.0.0
 sqlmodel>=0.0.14
 pydantic>=2.0.0
 pyyaml>=6.0.0
@@ -17,21 +18,20 @@ alembic>=1.12.0
 watchdog>=4.0.0
 httpx>=0.25.0
 croniter>=1.4.0
-
-# Development dependencies
-pytest>=7.0.0  # for running tests
-pytest-cov>=4.0.0  # for test coverage
-black>=23.0.0  # for code formatting
-flake8>=6.0.0  # for linting
-
-# Fill Benchmark Pipeline dependencies (optional)
+tenacity>=8.0.0
 requests>=2.31.0
-pandas>=2.0.0
 tqdm>=4.65.0
 python-dotenv>=1.0.0
-pydantic>=2.0.0
-pyyaml>=6.0.0
-tenacity>=8.0.0
-
-# Assistant Shell dependencies (optional)
 textual>=0.58.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-benchmark>=5.0.0
+pytest-asyncio>=0.23.0
+pytest-regressions>=2.0.0
+pytest-xdist>=3.0.0
+freezegun>=1.0.0
+respx>=0.20.0
+ruff>=0.1.0
+axe-core-python>=0.3.0

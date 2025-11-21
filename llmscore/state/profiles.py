@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 
 from sqlmodel import Field, Session, SQLModel, select
@@ -28,8 +28,8 @@ class ProfileModel(SQLModel, table=True):
     name: str = Field(primary_key=True)
     workspace_path: str
     default_session: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ProfileManager:
@@ -41,7 +41,7 @@ class ProfileManager:
         SQLModel.metadata.create_all(self.engine)
 
     def add(self, profile: Profile) -> Profile:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         with Session(self.engine) as session:
             model = session.get(ProfileModel, profile.name)
             if model is None:
@@ -91,7 +91,7 @@ class ProfileManager:
             if not model:
                 return None
             model.default_session = session_id
-            model.updated_at = datetime.utcnow()
+            model.updated_at = datetime.now(UTC)
             session.commit()
             session.refresh(model)
             return self._to_profile(model)

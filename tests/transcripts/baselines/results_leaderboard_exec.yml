@@ -1,0 +1,20 @@
+events:
+- prompt: llmscore exec results.leaderboard limit=2
+  response: |-
+    {
+      "entries": [
+        {
+          "model": "alpha",
+          "scores": {
+            "final_score": 0.95
+          }
+        },
+        {
+          "model": "beta",
+          "scores": {
+            "final_score": 0.9
+          }
+        }
+      ],
+      "sort_key": "final_score"
+    }

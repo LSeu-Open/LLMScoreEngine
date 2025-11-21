@@ -1,0 +1,34 @@
+events:
+- prompt: llmscore exec results.leaderboard limit=5
+  response: |-
+    {
+      "entries": [
+        {
+          "model": "sigma",
+          "scores": {
+            "final_score": 0.97
+          }
+        },
+        {
+          "model": "tau",
+          "scores": {
+            "final_score": 0.92
+          }
+        }
+      ],
+      "sort_key": "final_score"
+    }
+- prompt: llmscore exec results.compare primary=sigma secondary=tau
+  response: |-
+    {
+      "primary": "sigma",
+      "secondary": "tau",
+      "metrics": [
+        {
+          "metric": "final_score",
+          "primary": 0.97,
+          "secondary": 0.92,
+          "delta": 0.05
+        }
+      ]
+    }

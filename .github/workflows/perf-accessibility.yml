@@ -1,0 +1,164 @@
+name: Perf and Accessibility Checks
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  legacy-regressions:
+    name: Legacy Script Regressions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
+
+      - name: Run legacy regression suite
+        run: |
+          python -m pytest tests/legacy -vv
+
+  transcript-gate:
+    needs: legacy-regressions
+    name: Transcript Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev,assistant-shell]
+
+      - name: Transcript regression suite
+        run: |
+          python -m pytest tests/transcripts -vv
+
+      - name: Collect transcript artifacts
+        if: always()
+        run: |
+          rm -rf artifacts/manual-regressions/transcripts
+          mkdir -p artifacts/manual-regressions/transcripts
+          cp -R tests/transcripts/baselines artifacts/manual-regressions/transcripts/baselines || true
+          if [ -d tests/transcripts/output ]; then cp -R tests/transcripts/output artifacts/manual-regressions/transcripts/output; fi
+
+      - name: Upload transcript artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-regressions-transcripts
+          path: artifacts/manual-regressions/transcripts
+          if-no-files-found: warn
+
+  perf-accessibility:
+    runs-on: ubuntu-latest
+    needs: transcript-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download transcript artifacts
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: manual-regressions-transcripts
+          path: artifacts/manual-regressions
+
+      - name: Download previous perf benchmarks
+        if: github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          RUN_ID=$(gh run list --workflow "perf-accessibility.yml" --branch main --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$RUN_ID" ]; then
+            echo "No baseline run found"
+            exit 0
+          fi
+          gh run download "$RUN_ID" --name perf-benchmarks --dir baseline_artifacts || exit 0
+          unzip -oq baseline_artifacts/perf-benchmarks.zip -d baseline_artifacts/extracted || true
+          if [ -d baseline_artifacts/extracted/.benchmarks ]; then
+            mkdir -p .benchmarks
+            cp -R baseline_artifacts/extracted/.benchmarks/. .benchmarks/ || true
+            BASELINE_FILE=$(find .benchmarks -type f -name '*.json' | head -n 1)
+            if [ -n "$BASELINE_FILE" ]; then
+              BASELINE_ID=$(basename "$BASELINE_FILE" .json)
+              echo "BENCHMARK_BASELINE_ID=$BASELINE_ID" >> $GITHUB_ENV
+            fi
+          fi
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev,assistant-shell]
+
+      - name: Run targeted pytest suite
+        run: |
+          python -m pytest tests/shell/test_phase3_runtime.py tests/shell/test_output_cards.py tests/shell/test_runtime_e2e.py
+
+      - name: Accessibility smoke (axe-core)
+        run: |
+          python -m axe_core.run --help >/dev/null 2>&1 || true
+          echo "Placeholder for axe-core integration"
+
+      - name: Performance benchmarks – score.batch & leaderboard
+        run: |
+          set -euo pipefail
+          COMPARE_ARGS=""
+          if [ -n "${BENCHMARK_BASELINE_ID:-}" ]; then
+            COMPARE_ARGS="--benchmark-compare=${BENCHMARK_BASELINE_ID} --benchmark-compare-fail=mean:20%"
+          fi
+          mkdir -p perf_logs
+          python -m pytest tests/perf/test_smoke.py -vv --benchmark-autosave $COMPARE_ARGS 2>&1 | tee perf_logs/benchmark_compare.log
+          exit ${PIPESTATUS[0]:-0}
+
+      - name: Automation watch stress tests
+        run: |
+          python -m pytest tests/perf/automation/test_watch_stress.py -vv
+
+      - name: Collect perf artifacts snapshot
+        if: always()
+        run: |
+          mkdir -p artifacts/manual-regressions/perf
+          if [ -d .benchmarks ]; then cp -R .benchmarks artifacts/manual-regressions/perf/.; fi
+          if [ -d perf_logs ]; then cp -R perf_logs artifacts/manual-regressions/perf/.; fi
+
+      - name: Upload perf benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-benchmarks
+          path: |
+            .benchmarks
+            perf_logs
+          if-no-files-found: ignore
+
+      - name: Upload manual regression bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-regressions
+          path: artifacts/manual-regressions
+          if-no-files-found: warn

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Deque, Iterable, Iterator, List, Sequence
 
 from rapidfuzz import fuzz, process
+from prompt_toolkit.completion import Completer, Completion
 
 
 @dataclass(slots=True)
@@ -118,7 +119,9 @@ class PaletteProvider:
     # Internal helpers
     # ------------------------------------------------------------------
     @staticmethod
-    def _palette_key(entry: PaletteEntry) -> str:
+    def _palette_key(entry: PaletteEntry | str) -> str:
+        if isinstance(entry, str):
+            return entry
         parts = [
             entry.title,
             entry.action,
@@ -127,5 +130,29 @@ class PaletteProvider:
         ]
         return " ".join(part for part in parts if part)
 
+    def all_entries(self) -> Sequence[PaletteEntry]:
+        return list(self._entries)
 
-__all__ = ["PaletteEntry", "PaletteProvider"]
+
+class PaletteCompleter(Completer):
+    """prompt_toolkit completer backed by the palette provider."""
+
+    def __init__(self, provider: PaletteProvider) -> None:
+        self._provider = provider
+
+    def get_completions(self, document, complete_event):  # type: ignore[override]
+        text = document.text_before_cursor
+        if " " in text:
+            return
+        query = text.strip()
+        for entry in self._provider.search(query, limit=5):
+            display = f"{entry.action} — {entry.title}"
+            yield Completion(
+                entry.action,
+                start_position=-len(query),
+                display=display,
+                display_meta=entry.description,
+            )
+
+
+__all__ = ["PaletteEntry", "PaletteProvider", "PaletteCompleter"]

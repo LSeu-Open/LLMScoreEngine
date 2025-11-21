@@ -24,6 +24,7 @@ venv.bak/
 htmlcov/
 .tox/
 .hypothesis/
+.ruff_cache/
 
 # IDEs and editors
 .vscode/
@@ -33,21 +34,40 @@ htmlcov/
 *.swo
 *~
 
-# OS files
-.DS_Store
-Thumbs.db
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
 # Environment variables
 .env
 .env.*
-!.env.example
+.env.example*
+.env.example
 
 # Project-specific
 Models/
+filled_models/
 Results/
 *.Models/
 *.Results/
+local_config.yaml
+dev_docs/
+*.model_mapping
+*model*mapping*.json
+model_mapping.json
+models_mapping.json
 
 # Documentation (if you want to ignore generated docs)
 # Uncomment if needed:
-/docs/
+# /docs/
+site/
+
+# Generated Files
+.benchmarks/
+.mypy_cache/
+artifacts/
+Graph_Report.png
+*.log
+tools/fill-benchmark-pipeline/config.yaml
+tools/fill-benchmark-pipeline/.env.example

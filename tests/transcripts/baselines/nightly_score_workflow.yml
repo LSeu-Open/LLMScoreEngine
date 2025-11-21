@@ -1,0 +1,11 @@
+events:
+- prompt: llmscore run nightly_score
+  response: "{\n  \"workflow\": \"nightly_score\",\n  \"profile\": null,\n  \"steps\"\
+    : [\n    {\n      \"action\": \"score.model\",\n      \"description\": null,\n\
+    \      \"output\": {\n        \"status\": \"ok\",\n        \"action\": \"score.model\"\
+    ,\n        \"inputs\": {\n          \"model\": \"alpha\"\n        }\n      },\n\
+    \      \"duration\": 0.0\n    },\n    {\n      \"action\": \"results.leaderboard\"\
+    ,\n      \"description\": null,\n      \"output\": {\n        \"status\": \"ok\"\
+    ,\n        \"action\": \"results.leaderboard\",\n        \"inputs\": {\n     \
+    \     \"limit\": 3\n        }\n      },\n      \"duration\": 0.0\n    }\n  ]\n\
+    }"

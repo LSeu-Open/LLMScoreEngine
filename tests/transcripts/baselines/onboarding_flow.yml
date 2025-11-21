@@ -1,0 +1,27 @@
+events:
+- prompt: llmscore exec data.template model_name=gamma
+  response: |-
+    {
+      "model": "gamma",
+      "path": "models/gamma.json",
+      "status": "created"
+    }
+- prompt: llmscore exec data.fill model=gamma
+  response: |-
+    {
+      "model": "gamma",
+      "status": "queued",
+      "tasks": 4
+    }
+- prompt: llmscore exec score.model model=gamma
+  response: |-
+    {
+      "status": "ok",
+      "action": "score.model",
+      "inputs": {
+        "model": "gamma"
+      },
+      "scores": {
+        "final_score": 0.887
+      }
+    }

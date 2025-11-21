@@ -28,6 +28,7 @@ import math
 import argparse
 import sys
 from pathlib import Path
+from typing import Any, Dict, Optional, Sequence
 from config.scoring_config import HUGGING_FACE_SCORE_PARAMS
 
 # Add project root to sys.path for absolute imports, making the script runnable.
@@ -124,24 +125,30 @@ def extract_model_info(model_name: str) -> dict:
 # Main function
 # ------------------------------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Get Hugging Face model community score and metrics.")
-    parser.add_argument("model_name", help="Name of the Hugging Face model (e.g., microsoft/Phi-4-mini-reasoning)")
-    args = parser.parse_args()
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Get Hugging Face model community score and metrics."
+    )
+    parser.add_argument(
+        "model_name",
+        help="Name of the Hugging Face model (e.g., microsoft/Phi-4-mini-reasoning)",
+    )
+    return parser.parse_args(argv)
 
-    # Example usage
-    model_name = args.model_name # Change this to the model you want to score
-    
-    # Get all metrics at once
-    info = extract_model_info(model_name)
-    
-    # Print score prominently
+
+def main(argv: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+    args = parse_args(argv)
+    info = extract_model_info(args.model_name)
     print(f"\nHF COMMUNITY SCORE: {info['community_score']}/10")
-    
     print("\nDetailed metrics:")
     for key, value in info.items():
-        if key != "community_score":  # Skip community_score as we already displayed it
+        if key != "community_score":
             print(f"{key}: {value}")
+    return info
+
+
+if __name__ == "__main__":
+    main()
 
 
 

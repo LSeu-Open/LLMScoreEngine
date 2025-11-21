@@ -22,7 +22,7 @@
 
 import argparse
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Sequence
 from model_scoring.utils.logging import configure_console_only_logging
 from model_scoring.utils.csv_reporter import generate_csv_report
 from model_scoring.utils.graph_reporter import (
@@ -37,7 +37,7 @@ from llmscore.actions.registry import ActionRegistry
 # ------------------------------------------------------------------------------------------------
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     """Parse command line arguments."""
 
     parser = argparse.ArgumentParser(
@@ -58,6 +58,11 @@ def parse_args() -> argparse.Namespace:
         "--all",
         action="store_true",
         help="Score every model JSON located in the Models directory.",
+    )
+    parser.add_argument(
+        "--models-dir",
+        default="Models",
+        help="Directory containing model JSON files (defaults to ./Models).",
     )
     parser.add_argument(
         "--quiet",
@@ -86,17 +91,17 @@ def parse_args() -> argparse.Namespace:
         action="version",
         version="%(prog)s Beta v0.5",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 # ------------------------------------------------------------------------------------------------
 # Main script
 # ------------------------------------------------------------------------------------------------
 
 
-def main() -> None:
+def main(argv: Optional[Sequence[str]] = None) -> None:
     """Legacy scoring entry point."""
 
-    args = parse_args()
+    args = parse_args(argv)
     try:
         if args.csv:
             generate_csv_report()
@@ -112,9 +117,16 @@ def main() -> None:
         configure_console_only_logging(quiet=args.quiet)
 
         if args.all:
+            models_dir = args.models_dir
+            if not os.path.isdir(models_dir):
+                print(
+                    f"[-] Models directory not found: {models_dir}. "
+                    "Provide a valid path via --models-dir."
+                )
+                return
             model_names = [
                 path.removesuffix(".json")
-                for path in os.listdir("Models")
+                for path in os.listdir(models_dir)
                 if path.endswith(".json")
             ]
         else:
@@ -133,6 +145,7 @@ def main() -> None:
             "models": model_names,
             "quiet": args.quiet,
             "results_dir": "Results",
+            "models_dir": args.models_dir,
         }
         if args.config:
             print(f"[*] Loading custom configuration from: {args.config}")

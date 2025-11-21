@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import OrderedDict
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import (
     Any,
     Dict,
@@ -165,7 +165,7 @@ class ActionRegistry:
         event = OrchestratorEvent(
             kind=kind,
             message=message,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             payload=payload,
         )
         self._event_bus.emit(event)

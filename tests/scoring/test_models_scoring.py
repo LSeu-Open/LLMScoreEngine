@@ -331,11 +331,10 @@ def test_technical_score_edge_cases():
     # Context window edge cases
     context_params = scoring_config.TECHNICAL_SCORE_PARAMS['context_window']
     assert edge_scorer._calculate_context_score(0) == context_params['low_cw_points']
-    assert edge_scorer._calculate_context_score(9999999) == context_params['max_points']
+    assert edge_scorer._calculate_context_score(9_999_999) == context_params['max_points']
 
     # Size/performance ratio edge cases
     size_params = scoring_config.TECHNICAL_SCORE_PARAMS['size_perf_ratio']
-<<<<<<< ours
     # Very poor benchmark score should result in base points
     assert edge_scorer.calculate_size_perf_ratio(0, 1_000_000, 'dense') == size_params['base_points']
     # Very high benchmark score should be capped at max_points
@@ -343,44 +342,26 @@ def test_technical_score_edge_cases():
     # Test with None values
     assert edge_scorer.calculate_size_perf_ratio(None, 1, 'dense') == 0.0
     assert edge_scorer.calculate_size_perf_ratio(1, None, 'dense') == 0.0
-    assert edge_scorer.calculate_size_perf_ratio(1, 1, None) == 0.0 
-||||||| ancestor
-    print("\n[Technical Score Edge Cases]")
+    assert edge_scorer.calculate_size_perf_ratio(1, 1, None) == 0.0
 
-    # Price score with negative price should be treated as free (max points).
-    score1 = edge_scorer._calculate_price_score(-10.0)
-    print(f"  - Negative price -> Score: {score1}")
-    assert score1 == price_params['max_points']
-
-    # Context score with zero context window should receive low_cw_points.
-    score2 = edge_scorer._calculate_context_score(0)
-    print(f"  - Zero context -> Score: {score2}")
-    assert score2 == context_params['low_cw_points']
-
-    # Size/Perf ratio with zero benchmark score should result in base points.
-    score3 = edge_scorer.calculate_size_perf_ratio(0.0, 70_000_000_000, 'dense')
-    print(f"  - Zero benchmark for ratio -> Score: {score3}")
-    assert score3 == size_params['base_points']
-    
     # Size/Perf ratio with unknown architecture should use default factor.
     score_dense = edge_scorer.calculate_size_perf_ratio(85.0, 70_000_000_000, 'dense')
     score_unknown = edge_scorer.calculate_size_perf_ratio(85.0, 70_000_000_000, 'MyWeirdArch')
-    print(f"  - Unknown architecture -> Dense: {score_dense:.2f}, Unknown: {score_unknown:.2f}")
     assert score_dense == score_unknown
 
-    # Full technical score with missing size/perf ratio inputs.
-    # price_score(1.5) -> 7.475; context_score(131072) -> 3.778; ratio -> 0.0
-    # total = 7.475 + 3.778 = 11.253 -> rounded 11.25
-    score4 = edge_scorer.calculate_technical_score(1.5, 131072, None, None, None)
-    print(f"  - Missing ratio inputs -> Score: {score4}")
-    assert score4 == 11.25 
-=======
-    # Very poor benchmark score should result in base points
-    assert edge_scorer.calculate_size_perf_ratio(0, 1_000_000, 'dense') == size_params['base_points']
-    # Very high benchmark score should be capped at max_points
-    assert edge_scorer.calculate_size_perf_ratio(100, 1_000_000, 'dense') <= size_params['max_points']
-    # Test with None values
-    assert edge_scorer.calculate_size_perf_ratio(None, 1, 'dense') == 0.0
-    assert edge_scorer.calculate_size_perf_ratio(1, None, 'dense') == 0.0
-    assert edge_scorer.calculate_size_perf_ratio(1, 1, None) == 0.0 
->>>>>>> theirs
+    # Full technical score with missing size/perf ratio inputs should omit ratio points.
+    price_contribution = (
+        edge_scorer._calculate_price_component_score(1.5, 'input_price')
+        + edge_scorer._calculate_price_component_score(3.0, 'output_price')
+    )
+    context_contribution = edge_scorer._calculate_context_score(131_072)
+    expected_without_ratio = round(price_contribution + context_contribution, 2)
+    score_without_ratio = edge_scorer.calculate_technical_score(
+        input_price=1.5,
+        output_price=3.0,
+        context_window=131_072,
+        benchmark_score=None,
+        param_count=None,
+        architecture=None,
+    )
+    assert score_without_ratio == expected_without_ratio

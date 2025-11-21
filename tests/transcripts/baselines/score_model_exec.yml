@@ -1,0 +1,13 @@
+events:
+- prompt: llmscore exec score.model model=alpha
+  response: |-
+    {
+      "status": "ok",
+      "action": "score.model",
+      "inputs": {
+        "model": "alpha"
+      },
+      "scores": {
+        "final_score": 0.9123
+      }
+    }

@@ -21,7 +21,9 @@ import json
 import os
 import time
 import argparse
-from typing import Dict, Any, Optional, List, Union
+import re
+import copy
+from typing import Dict, Any, Optional, List, Union, Sequence, Tuple
 from pathlib import Path
 import requests
 from dataclasses import dataclass, asdict
@@ -226,34 +228,113 @@ class APIClient:
             return None
 
 
+def normalize_name(name: str) -> str:
+    """Normalize model name for fuzzy matching (remove non-alphanumeric, lowercase)"""
+    return re.sub(r'[^a-z0-9]', '', name.lower())
+
+
 class ArtificialAnalysisClient(APIClient):
-    """Client for Artificial Analysis API"""
+    """Client for Artificial Analysis API (v2 data endpoints)."""
+
+    LLMS_ENDPOINT = "https://artificialanalysis.ai/api/v2/data/llms"
 
     def __init__(self, api_key: Optional[str] = None, rate_limit: float = 1.0,
-                 max_retries: int = 3, backoff_factor: float = 2.0, timeout: int = 30):
+                 max_retries: int = 3, backoff_factor: float = 2.0, timeout: int = 30,
+                 model_mapping: Optional[Dict[str, str]] = None):
         super().__init__(
-            base_url="https://api.artificialanalysis.ai/v1",
+            base_url=self.LLMS_ENDPOINT,
             api_key=api_key,
             rate_limit=rate_limit,
             max_retries=max_retries,
             backoff_factor=backoff_factor,
-            timeout=timeout
+            timeout=timeout,
         )
+        self.model_mapping = model_mapping or {}
+        self._model_cache: Optional[List[Dict[str, Any]]] = None
+
+    def _aa_headers(self) -> Dict[str, str]:
+        if not self.api_key:
+            raise APIAuthenticationError("Artificial Analysis API key is required.")
+        return {"x-api-key": self.api_key}
+
+    def _fetch_llm_payload(self, endpoint: str = "models") -> Dict[str, Any]:
+        """Invoke the documented v2 LLMS endpoint."""
+        self._rate_limit_wait()
+        url = f"{self.LLMS_ENDPOINT}/{endpoint.lstrip('/')}"
+        response = requests.get(url, headers=self._aa_headers(), timeout=self.timeout)
+        self._handle_response_errors(response, url)
+        try:
+            return response.json()
+        except json.JSONDecodeError as exc:  # pragma: no cover - unexpected payloads
+            raise APIError(f"Invalid JSON response from {url}: {exc}") from exc
+
+    def list_models(self) -> List[Dict[str, Any]]:
+        if self._model_cache is not None:
+            return self._model_cache
+        payload = self._fetch_llm_payload("models")
+        models = payload.get("data", [])
+        if not isinstance(models, list):
+            logger.warning("Unexpected response shape for AA models endpoint")
+            models = []
+        self._model_cache = models
+        return models
 
     def get_model_info(self, model_name: str) -> Optional[Dict]:
         """Fetch comprehensive model information"""
-        # Try exact match first
-        data = self.get(f"models/{model_name}")
+        # 1. Check explicit mapping first
+        models = self.list_models()
+        if model_name in self.model_mapping:
+            mapped_value = self.model_mapping[model_name]
+            logger.info("Using mapped ID for %s -> %s", model_name, mapped_value)
 
-        if not data:
-            # Try fuzzy search
-            all_models = self.get("models")
-            if all_models:
-                for model in all_models.get('models', []):
-                    if model_name.lower() in model.get('name', '').lower():
-                        return self.get(f"models/{model['id']}")
+            def _flatten_tokens(value: Any) -> List[str]:
+                if isinstance(value, dict):
+                    return [
+                        value.get("id"),
+                        value.get("slug"),
+                        value.get("name"),
+                    ]
+                if isinstance(value, (list, tuple, set)):
+                    tokens: List[str] = []
+                    for item in value:
+                        tokens.extend(_flatten_tokens(item))
+                    return tokens
+                return [value]
 
-        return data
+            target_tokens = [token for token in _flatten_tokens(mapped_value) if token]
+            normalized_targets = [normalize_name(token) for token in target_tokens if token]
+
+            for entry in models:
+                entry_tokens = [entry.get("id"), entry.get("slug"), entry.get("name")]
+                entry_norm = [normalize_name(token) for token in entry_tokens if token]
+
+                if any(token == entry_token for token in target_tokens for entry_token in entry_tokens if token and entry_token):
+                    return entry
+                if any(target == entry_token for target in normalized_targets for entry_token in entry_norm if target and entry_token):
+                    return entry
+
+            logger.warning("Mapped target %s not found in AA catalog", mapped_value)
+
+        normalized_target = normalize_name(model_name)
+
+        if logger.level <= logging.DEBUG:
+            logger.debug("Available AA models: %s", [m.get("name") for m in models])
+
+        def _matches(entry: Dict[str, Any]) -> bool:
+            candidates = [entry.get("name", ""), entry.get("slug", ""), entry.get("id", "")]
+            return any(normalized_target == normalize_name(candidate) for candidate in candidates)
+
+        for entry in models:
+            if _matches(entry):
+                return entry
+
+        for entry in models:
+            norm_name = normalize_name(entry.get("name", ""))
+            if (normalized_target in norm_name or norm_name in normalized_target) and len(norm_name) > 5:
+                logger.info("Partial AA match %s -> %s", model_name, entry.get("name"))
+                return entry
+
+        return None
 
     def extract_benchmarks(self, model_data: Dict) -> Dict[str, Any]:
         """Extract benchmark scores from API response"""
@@ -275,7 +356,7 @@ class ArtificialAnalysisClient(APIClient):
             'intelligence_index': 'artificial_analysis'
         }
 
-        scores = model_data.get('benchmarks', {})
+        scores = model_data.get('evaluations', {})
         for api_key, json_key in benchmark_mapping.items():
             if api_key in scores:
                 benchmarks[json_key] = scores[api_key]
@@ -287,12 +368,14 @@ class ArtificialAnalysisClient(APIClient):
         if not model_data:
             return ModelSpecs()
 
+        pricing = model_data.get('pricing', {})
+        creator = model_data.get('model_creator', {})
         return ModelSpecs(
-            input_price=model_data.get('pricing', {}).get('input_per_million'),
-            output_price=model_data.get('pricing', {}).get('output_per_million'),
+            input_price=pricing.get('price_1m_input_tokens'),
+            output_price=pricing.get('price_1m_output_tokens'),
             context_window=model_data.get('context_window'),
             param_count=model_data.get('parameters'),
-            architecture=model_data.get('architecture')
+            architecture=creator.get('name') or model_data.get('slug'),
         )
 
 
@@ -354,12 +437,40 @@ class LLMBenchmarkPipeline:
             validated_config = PipelineConfig(**config.model_dump() if hasattr(config, 'model_dump') else config.__dict__)
 
             self.config = validated_config
+            
+            # Load model mapping if exists
+            model_mapping = {}
+            script_dir = Path(__file__).parent
+            mapping_path = script_dir / "model_mapping.json"
+            if mapping_path.exists():
+                try:
+                    with open(mapping_path, 'r', encoding='utf-8') as f:
+                        model_mapping = json.load(f)
+                    logger.info(f"Loaded model mapping from {mapping_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to load model mapping: {e}")
+
+            self.ambiguous_candidates: Dict[str, List[Dict[str, Any]]] = {}
+            ambiguous_path = script_dir / "model_mapping_ambiguous.json"
+            if ambiguous_path.exists():
+                try:
+                    with open(ambiguous_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        self.ambiguous_candidates = data
+                        logger.info(f"Loaded ambiguous mapping from {ambiguous_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to load ambiguous mapping: {e}")
+
+            self.synthetic_lookup: Dict[str, Dict[str, Any]] = {}
+
             self.aa_client = ArtificialAnalysisClient(
                 api_key=validated_config.artificial_analysis_key,
                 rate_limit=validated_config.rate_limit_aa,
                 max_retries=validated_config.max_retries,
                 backoff_factor=validated_config.retry_backoff_factor,
-                timeout=validated_config.timeout
+                timeout=validated_config.timeout,
+                model_mapping=model_mapping
             )
             self.hf_client = HuggingFaceClient(
                 api_key=validated_config.huggingface_key,
@@ -377,6 +488,39 @@ class LLMBenchmarkPipeline:
         except ValidationError as e:
             logger.error(f"Configuration validation failed: {e}")
             raise
+
+    @staticmethod
+    def _normalize_architecture(raw_value: Any) -> str:
+        """Map provider labels to architecture class (dense/moe)."""
+        if raw_value is None:
+            return "dense"
+
+        if isinstance(raw_value, str):
+            lowered = raw_value.strip().lower()
+            if any(token in lowered for token in ["moe", "mixture-of-experts", "mixtral", "gemini 1.5"]):
+                return "moe"
+            if lowered in {"dense", "moe"}:
+                return lowered
+        return "dense"
+
+    @staticmethod
+    def _normalize_percentage_value(value: Union[int, float]) -> float:
+        if value is None:
+            return value
+        if isinstance(value, (int, float)) and 0 <= value <= 1:
+            return round(value * 100, 3)
+        return value
+
+    def _normalize_percentage_sections(self, template: Dict[str, Any], result: Dict[str, Any]) -> None:
+        """Ensure benchmarks filled from APIs are represented on 0-100 scale."""
+
+        for section in ('entity_benchmarks', 'dev_benchmarks'):
+            original_section = template.get(section, {}) or {}
+            current_section = result.get(section, {}) or {}
+
+            for key, value in current_section.items():
+                if original_section.get(key) is None and isinstance(value, (int, float)):
+                    current_section[key] = self._normalize_percentage_value(value)
 
     def load_template(self, filepath: str) -> Dict:
         """Load and validate JSON template"""
@@ -412,8 +556,8 @@ class LLMBenchmarkPipeline:
 
         logger.info(f"Processing model: {validated_model.name}")
 
-        # Start with template copy
-        result = template.copy()
+        template_original = copy.deepcopy(template)
+        result = copy.deepcopy(template)
 
         # 1. Fetch from Artificial Analysis
         logger.info("Fetching from Artificial Analysis...")
@@ -430,9 +574,15 @@ class LLMBenchmarkPipeline:
 
             # Fill model specs
             specs = self.aa_client.extract_specs(aa_data)
-            result['model_specs'].update(
-                {k: v for k, v in asdict(specs).items() if v is not None}
-            )
+            normalized_specs = {}
+            for key, value in asdict(specs).items():
+                if value is None:
+                    continue
+                if key == 'architecture':
+                    normalized_specs[key] = self._normalize_architecture(value)
+                else:
+                    normalized_specs[key] = value
+            result['model_specs'].update(normalized_specs)
 
             logger.info(f"  ✓ Retrieved {len(benchmarks)} benchmarks from AA")
         else:
@@ -452,6 +602,8 @@ class LLMBenchmarkPipeline:
                         result['dev_benchmarks'][key] = value
                     elif key == 'param_count' and result['model_specs']['param_count'] is None:
                         result['model_specs']['param_count'] = value
+                    elif key == 'architecture' and result['model_specs'].get('architecture') is None:
+                        result['model_specs']['architecture'] = self._normalize_architecture(value)
 
                 logger.info("  ✓ Retrieved data from Hugging Face")
             else:
@@ -466,16 +618,18 @@ class LLMBenchmarkPipeline:
                     filled += 1
             return filled
 
-        filled_entity = count_filled_fields(template['entity_benchmarks'], result['entity_benchmarks'])
-        filled_dev = count_filled_fields(template['dev_benchmarks'], result['dev_benchmarks'])
-        filled_community = count_filled_fields(template['community_score'], result['community_score'])
-        filled_specs = count_filled_fields(template['model_specs'], result['model_specs'])
+        self._normalize_percentage_sections(template_original, result)
+
+        filled_entity = count_filled_fields(template_original['entity_benchmarks'], result['entity_benchmarks'])
+        filled_dev = count_filled_fields(template_original['dev_benchmarks'], result['dev_benchmarks'])
+        filled_community = count_filled_fields(template_original['community_score'], result['community_score'])
+        filled_specs = count_filled_fields(template_original['model_specs'], result['model_specs'])
 
         total_fillable_fields = (
-            sum(1 for v in template['entity_benchmarks'].values() if v is None) +
-            sum(1 for v in template['dev_benchmarks'].values() if v is None) +
-            sum(1 for v in template['community_score'].values() if v is None) +
-            sum(1 for v in template['model_specs'].values() if v is None)
+            sum(1 for v in template_original['entity_benchmarks'].values() if v is None) +
+            sum(1 for v in template_original['dev_benchmarks'].values() if v is None) +
+            sum(1 for v in template_original['community_score'].values() if v is None) +
+            sum(1 for v in template_original['model_specs'].values() if v is None)
         )
 
         total_filled_fields = filled_entity + filled_dev + filled_community + filled_specs
@@ -485,11 +639,194 @@ class LLMBenchmarkPipeline:
 
         return result
 
+    def _expand_models_with_ambiguous(
+        self, models: List[Union[Dict, ModelInfo]]
+    ) -> Tuple[List[Union[Dict, ModelInfo]], Dict[str, Dict[str, Any]]]:
+        """Append ambiguous AA candidates so they are processed like regular models."""
+
+        if not self.ambiguous_candidates:
+            return list(models), {}
+
+        expanded_models = list(models)
+        existing_norms = set()
+        for entry in expanded_models:
+            name = entry.get('name') if isinstance(entry, dict) else getattr(entry, 'name', None)
+            if name:
+                existing_norms.add(normalize_name(name))
+
+        synthetic_lookup: Dict[str, Dict[str, Any]] = {}
+        synthetic_models: List[Dict[str, str]] = []
+
+        for local_name, candidates in self.ambiguous_candidates.items():
+            norm_local = normalize_name(local_name)
+            local_present = norm_local in existing_norms
+            if not local_present:
+                logger.debug(
+                    "Injecting ambiguous candidates for '%s' even though it was not part of the input batch",
+                    local_name,
+                )
+
+            for candidate in candidates:
+                candidate_name = (
+                    candidate.get('name')
+                    or candidate.get('slug')
+                    or candidate.get('id')
+                )
+                if not candidate_name:
+                    continue
+
+                norm_candidate = normalize_name(candidate_name)
+                if norm_candidate in existing_norms:
+                    continue
+
+                synthetic_models.append({'name': candidate_name})
+                synthetic_lookup[norm_candidate] = {
+                    'source_local_name': local_name,
+                    'candidate_name': candidate_name,
+                    'candidate_id': candidate.get('id'),
+                    'slug': candidate.get('slug'),
+                }
+                existing_norms.add(norm_candidate)
+
+        if synthetic_models:
+            logger.info(
+                "Added %d ambiguous candidate(s) to processing queue",
+                len(synthetic_models),
+            )
+
+        return expanded_models + synthetic_models, synthetic_lookup
+
+    def _write_ambiguous_summary(self, results: List[Dict]) -> None:
+        """Persist a summary for synthetic ambiguous candidates."""
+
+        if not self.synthetic_lookup:
+            return
+
+        ambiguous_results: List[Dict[str, Any]] = []
+        for result in results:
+            model_name = result.get('model')
+            if not model_name:
+                continue
+            norm_name = normalize_name(model_name)
+            origin = self.synthetic_lookup.get(norm_name)
+            if not origin:
+                continue
+
+            entry = {
+                **origin,
+                'status': result.get('status'),
+            }
+            if 'output' in result:
+                entry['output'] = result['output']
+            if 'error' in result:
+                entry['error'] = result['error']
+            ambiguous_results.append(entry)
+
+        if not ambiguous_results:
+            return
+
+        summary_path = Path(self.config.output_dir) / "ambiguous_candidates_summary.json"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            json.dump(ambiguous_results, f, indent=2)
+        logger.info("Ambiguous candidate summary saved to %s", summary_path)
+
+        # Reset lookup after writing summary to avoid stale data
+        self.synthetic_lookup = {}
+
+    def _resolve_ambiguous_candidates(self, local_name: str) -> List[Dict[str, Any]]:
+        candidates = self.ambiguous_candidates.get(local_name)
+        if candidates:
+            return candidates
+
+        norm_local = normalize_name(local_name)
+        for stored_name, stored_candidates in self.ambiguous_candidates.items():
+            if normalize_name(stored_name) == norm_local:
+                return stored_candidates
+        return []
+
+    def generate_ambiguous_outputs(
+        self,
+        local_model_name: str,
+        template: Dict,
+        output_dir: Union[str, Path],
+        source_file: Optional[Path] = None,
+    ) -> List[Dict[str, Any]]:
+        """Create filled outputs for each ambiguous candidate of a local model."""
+
+        candidates = self._resolve_ambiguous_candidates(local_model_name)
+        if not candidates:
+            return []
+
+        output_dir_path = Path(output_dir)
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+
+        results: List[Dict[str, Any]] = []
+        base_norm = normalize_name(local_model_name)
+
+        for candidate in candidates:
+            candidate_name = (
+                candidate.get('name')
+                or candidate.get('slug')
+                or candidate.get('id')
+            )
+            if not candidate_name:
+                continue
+
+            if normalize_name(candidate_name) == base_norm:
+                # Already produced by the main model entry
+                continue
+
+            try:
+                candidate_info = ModelInfo(name=candidate_name)
+                filled_data = self.fill_model_data(template=template, model_info=candidate_info)
+                safe_name = candidate_name.replace('/', '_').replace('\\', '_')
+                output_path = output_dir_path / f"{safe_name}_filled.json"
+                self.save_result(filled_data, str(output_path))
+
+                results.append({
+                    'file': str(source_file) if source_file else None,
+                    'model': candidate_name,
+                    'status': 'success',
+                    'output': str(output_path),
+                    'source_local_name': local_model_name,
+                })
+            except ValidationError as exc:
+                logger.error("Ambiguous candidate validation failed for %s: %s", candidate_name, exc)
+                results.append({
+                    'file': str(source_file) if source_file else None,
+                    'model': candidate_name,
+                    'status': 'validation_error',
+                    'error': str(exc),
+                    'source_local_name': local_model_name,
+                })
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error("Failed to generate ambiguous output for %s: %s", candidate_name, exc)
+                results.append({
+                    'file': str(source_file) if source_file else None,
+                    'model': candidate_name,
+                    'status': 'error',
+                    'error': str(exc),
+                    'source_local_name': local_model_name,
+                })
+
+        if results:
+            logger.info(
+                "Generated %d ambiguous output(s) for %s",
+                sum(1 for r in results if r['status'] == 'success'),
+                local_model_name,
+            )
+
+        return results
+
     def process_batch(self, models: List[Union[Dict, ModelInfo]]) -> List[Dict]:
         """Process multiple models in batch"""
 
         # Create output directory
         Path(self.config.output_dir).mkdir(parents=True, exist_ok=True)
+
+        models_to_process, synthetic_lookup = self._expand_models_with_ambiguous(models)
+        self.synthetic_lookup = synthetic_lookup
 
         # Load and validate template
         template = self.load_template(self.config.template_path)
@@ -497,7 +834,7 @@ class LLMBenchmarkPipeline:
         results = []
         successful_models = 0
 
-        for i, model_info in enumerate(models, 1):
+        for i, model_info in enumerate(models_to_process, 1):
             try:
                 # Validate model info
                 if isinstance(model_info, dict):
@@ -514,29 +851,54 @@ class LLMBenchmarkPipeline:
                 output_path = Path(self.config.output_dir) / f"{safe_name}_filled.json"
                 self.save_result(filled_data, str(output_path))
 
-                results.append({
+                norm_name = normalize_name(validated_model.name)
+                origin = synthetic_lookup.get(norm_name)
+
+                result_entry = {
                     'model': validated_model.name,
                     'status': 'success',
                     'output': str(output_path)
-                })
+                }
+                if origin:
+                    result_entry['source_local_name'] = origin['source_local_name']
+
+                results.append(result_entry)
                 successful_models += 1
 
             except ValidationError as e:
                 error_msg = f"Model validation failed: {e}"
-                logger.error(f"Error processing {model_info.get('name', 'unknown')}: {error_msg}")
-                results.append({
-                    'model': model_info.get('name', 'unknown') if isinstance(model_info, dict) else str(model_info),
+                model_label = (
+                    model_info.get('name', 'unknown') if isinstance(model_info, dict)
+                    else getattr(model_info, 'name', str(model_info))
+                )
+                logger.error(f"Error processing {model_label}: {error_msg}")
+                norm_name = normalize_name(model_label)
+                origin = synthetic_lookup.get(norm_name)
+                result_entry = {
+                    'model': model_label,
                     'status': 'validation_error',
                     'error': error_msg
-                })
+                }
+                if origin:
+                    result_entry['source_local_name'] = origin['source_local_name']
+                results.append(result_entry)
             except Exception as e:
                 error_msg = f"Unexpected error: {str(e)}"
-                logger.error(f"Error processing {model_info.get('name', 'unknown') if isinstance(model_info, dict) else str(model_info)}: {error_msg}")
-                results.append({
-                    'model': model_info.get('name', 'unknown') if isinstance(model_info, dict) else str(model_info),
+                model_label = (
+                    model_info.get('name', 'unknown') if isinstance(model_info, dict)
+                    else getattr(model_info, 'name', str(model_info))
+                )
+                logger.error(f"Error processing {model_label}: {error_msg}")
+                norm_name = normalize_name(model_label)
+                origin = synthetic_lookup.get(norm_name)
+                result_entry = {
+                    'model': model_label,
                     'status': 'error',
                     'error': error_msg
-                })
+                }
+                if origin:
+                    result_entry['source_local_name'] = origin['source_local_name']
+                results.append(result_entry)
 
                 # Continue processing if configured to do so
                 if not self.config.continue_on_error:
@@ -550,6 +912,8 @@ class LLMBenchmarkPipeline:
 
         logger.info(f"\nBatch processing complete. {successful_models}/{len(models)} models successful.")
         logger.info(f"Summary saved to {summary_path}")
+
+        self._write_ambiguous_summary(results)
         return results
 
 
@@ -596,6 +960,10 @@ Examples:
     # Launch interactive command
     subparsers.add_parser('launch',
                          help='Launch interactive pipeline mode')
+
+    # Map models command
+    subparsers.add_parser('map-models',
+                         help='Generate model mapping file by matching local models with API models')
 
     # Config file
     parser.add_argument('--config', '-c',
@@ -859,6 +1227,21 @@ def launch_interactive():
             if verbose:
                 print(f"   ✅ Saved to: {output_path}")
 
+            ambiguous_results = pipeline.generate_ambiguous_outputs(
+                local_model_name=model_name,
+                template=template,
+                output_dir=output_dir,
+                source_file=file_path,
+            )
+            if ambiguous_results:
+                results.extend(ambiguous_results)
+                success_count = sum(1 for entry in ambiguous_results if entry['status'] == 'success')
+                successful += success_count
+                if verbose:
+                    for entry in ambiguous_results:
+                        status_symbol = '✅' if entry['status'] == 'success' else '⚠️'
+                        print(f"   {status_symbol} Ambiguous {entry['model']} -> {entry.get('output') or entry.get('error')}")
+
         except Exception as e:
             error_msg = str(e)
             print(f"   ❌ Error: {error_msg}")
@@ -896,37 +1279,207 @@ def launch_interactive():
     print("=" * 60)
 
 
-def main():
-    """Main entry point with configuration management"""
-    parser = create_parser()
-    args = parser.parse_args()
+def generate_mapping_interactive():
+    """Interactive tool to generate model mapping file"""
+    print("🗺️  Model Mapping Generator")
+    print("=" * 50)
+    
+    # 1. Setup API Client
+    aa_key = os.getenv('ARTIFICIAL_ANALYSIS_API_KEY')
+    if not aa_key:
+        aa_key = input("Artificial Analysis API key: ").strip()
+        if not aa_key:
+            print("❌ API key is required")
+            return
+
+    client = ArtificialAnalysisClient(api_key=aa_key)
+    
+    # 2. Get Input Folder
+    print("\n📁 Input Folder")
+    while True:
+        input_folder = input("Input folder containing model JSONs (default: ./): ").strip()
+        input_folder = input_folder if input_folder else "."
+        try:
+            json_files = scan_json_folder(input_folder)
+            break
+        except (FileNotFoundError, NotADirectoryError) as e:
+            print(f"❌ Error: {e}")
+            continue
+
+    if not json_files:
+        print("❌ No JSON files found")
+        return
+
+    # 3. Fetch API Models
+    print("\n📡 Fetching model list from Artificial Analysis...")
+    try:
+        api_models = client.list_models()
+    except Exception as exc:  # pragma: no cover - network errors
+        print(f"❌ Failed to fetch models from API: {exc}")
+        return
+    
+    if not api_models:
+        print("❌ API returned no models")
+        return
+    print(f"✅ Retrieved {len(api_models)} models from API")
+
+    # 4. Perform Matching
+    print("\n🔄 Matching models...")
+    matches: Dict[str, str] = {}
+    failures: List[str] = []
+    ambiguous_details: Dict[str, List[Dict[str, Any]]] = {}
+    
+    for file_path in json_files:
+        local_names = detect_models_in_file(file_path)
+        local_name = local_names[0] if local_names else file_path.stem
+        normalized_local = normalize_name(local_name)
+        
+        found = False
+        # Try exact/normalized match first
+        for model in api_models:
+            api_name = model.get('name', '')
+            api_id = model.get('id', '')
+            norm_api_name = normalize_name(api_name)
+            norm_api_id = normalize_name(api_id)
+            
+            if normalized_local == norm_api_name or normalized_local == norm_api_id:
+                matches[local_name] = api_id
+                print(f"  ✅ {local_name} -> {api_name} ({api_id}) [Exact/Norm]")
+                found = True
+                break
+        
+        if not found:
+             # Try substring match
+             candidates = []
+             for model in api_models:
+                api_name = model.get('name', '')
+                api_id = model.get('id', '')
+                norm_api_name = normalize_name(api_name)
+                 
+                if normalized_local in norm_api_name or norm_api_name in normalized_local:
+                    # Filter out too short matches to avoid false positives
+                    if len(normalized_local) > 4 and len(norm_api_name) > 4:
+                        candidates.append(model)
+            
+             if len(candidates) == 1:
+                 candidate = candidates[0]
+                 api_name = candidate.get('name', '')
+                 matches[local_name] = api_name or candidate.get('slug', '')
+                 print(f"  ⚠️ {local_name} -> {api_name} [Partial, mapped to official name]")
+                 found = True
+             elif len(candidates) > 1:
+                 names_list = ", ".join(model.get('name', 'unknown') for model in candidates)
+                 print(f"  ❓ {local_name} -> Multiple candidates: {names_list}")
+                 failures.append(local_name)
+                 enriched: List[Dict[str, Any]] = []
+                 for candidate in candidates:
+                     summary = {
+                         "name": candidate.get('name'),
+                         "slug": candidate.get('slug'),
+                         "id": candidate.get('id'),
+                         "release_date": candidate.get('release_date'),
+                         "benchmarks": client.extract_benchmarks(candidate),
+                         "specs": asdict(client.extract_specs(candidate)),
+                     }
+                     enriched.append(summary)
+                     print(
+                         f"     ↳ {candidate.get('name')} (slug: {candidate.get('slug')}, id: {candidate.get('id')})"
+                     )
+                 ambiguous_details[local_name] = enriched
+             else:
+                 print(f"  ❌ {local_name} -> No match found")
+                 failures.append(local_name)
+
+    # 5. Generate Output
+    print("\n" + "=" * 50)
+    print(f"Matched: {len(matches)} | Unmatched: {len(failures)}")
+    
+    if matches:
+        output_path = Path("tools/fill-benchmark-pipeline/model_mapping.json")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(matches, f, indent=2)
+            
+        print(f"\n💾 Generated mapping file at: {output_path}")
+        print("Review this file and add any missing mappings manually.")
+    
+    if ambiguous_details:
+        ambiguous_path = Path("tools/fill-benchmark-pipeline/model_mapping_ambiguous.json")
+        with open(ambiguous_path, 'w', encoding='utf-8') as f:
+            json.dump(ambiguous_details, f, indent=2)
+        print(
+            f"⚠️  Saved detailed candidate info for ambiguous matches to: {ambiguous_path}"
+        )
+
+        per_model_dir = Path("tools/fill-benchmark-pipeline/ambiguous_mappings")
+        per_model_dir.mkdir(parents=True, exist_ok=True)
+
+        def _safe_filename(name: str) -> str:
+            return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)
+
+        for local_name, candidates in ambiguous_details.items():
+            sanitized = _safe_filename(local_name)
+            per_model_path = per_model_dir / f"{sanitized}.json"
+            payload = {
+                "local_name": local_name,
+                "candidates": candidates,
+            }
+            with open(per_model_path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, indent=2)
+        print(
+            f"🗂️  Also wrote {len(ambiguous_details)} per-model ambiguous files to: {per_model_dir}"
+        )
+        
+        # 6. Optional Verification
+        verify = input("\nVerify mappings by fetching info? [y/N]: ").strip().lower()
+        if verify == 'y':
+            print("\nVerifying...")
+            client.model_mapping = matches
+            for local, api_id in matches.items():
+                info = client.get_model_info(local)
+                status = "✅ OK" if info else "❌ Failed"
+                print(f"  {local} -> {status}")
+    else:
+        print("\n❌ No matches found to save.")
+
+
+def _run_pipeline_cli(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    # Handle map-models command
+    if args.command == 'map-models':
+        try:
+            generate_mapping_interactive()
+            return 0
+        except KeyboardInterrupt:
+            print("\n\n❌ Operation cancelled")
+            return 1
+        except Exception as e:
+             logger.error(f"Mapping generation failed: {e}")
+             return 1
 
     # Handle interactive launch command
     if args.command == 'launch':
         try:
             launch_interactive()
-            exit(0)
+            return 0
         except KeyboardInterrupt:
             print("\n\n❌ Operation cancelled by user")
-            exit(1)
-        except Exception as e:
+            return 1
+        except Exception as e:  # pragma: no cover - defensive logging
             logger.error(f"Interactive mode failed: {e}")
-            exit(1)
+            return 1
 
     # Set logging level for non-interactive modes
     log_level = 'DEBUG' if args.verbose else args.log_level
     logging.getLogger().setLevel(getattr(logging, log_level))
 
     try:
-        # Load configuration
-        config_data = {}
+        config_data: Dict[str, Any] = {}
 
-        # Load from config file if provided
         if args.config:
             logger.info(f"Loading configuration from {args.config}")
             config_data = load_config_from_file(args.config)
 
-        # Override with command line arguments
         if args.template:
             config_data['template_path'] = args.template
         if args.output_dir:
@@ -942,7 +1495,6 @@ def main():
         if args.no_continue_on_error:
             config_data['continue_on_error'] = False
 
-        # Load API keys from args or environment
         if args.aa_key:
             config_data['artificial_analysis_key'] = args.aa_key
         elif 'ARTIFICIAL_ANALYSIS_API_KEY' in os.environ:
@@ -953,29 +1505,23 @@ def main():
         elif 'HUGGINGFACE_API_KEY' in os.environ:
             config_data['huggingface_key'] = os.environ['HUGGINGFACE_API_KEY']
 
-        # Validate required parameters
         if not args.models and 'models' not in config_data:
             parser.error("--models is required (or specify in config file)")
         if not args.template and 'template_path' not in config_data:
             parser.error("--template is required (or specify in config file)")
 
-        # Load models
         if args.models:
             models = load_models(args.models)
         else:
             models = config_data['models']
 
-        # Create pipeline config
         pipeline_config = PipelineConfig(**config_data)
-
-        # Initialize and run pipeline
         pipeline = LLMBenchmarkPipeline(pipeline_config)
         results = pipeline.process_batch(models)
 
-        # Print summary
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("BATCH PROCESSING SUMMARY")
-        print("="*60)
+        print("=" * 60)
 
         success_count = sum(1 for r in results if r['status'] == 'success')
         error_count = sum(1 for r in results if r['status'] in ['error', 'validation_error'])
@@ -992,16 +1538,23 @@ def main():
                 status_info += f" - {result.get('error', '')}"
             print(f"{status_symbol} {result['model']}: {status_info}")
 
-        # Exit with appropriate code
-        exit(0 if error_count == 0 else 1)
+        return 0 if error_count == 0 else 1
 
     except ValidationError as e:
         logger.error(f"Configuration validation failed: {e}")
-        exit(1)
-    except Exception as e:
+        return 1
+    except Exception as e:  # pragma: no cover - safety net
         logger.error(f"Unexpected error: {e}")
-        exit(1)
+        return 1
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Main entry point with configuration management."""
+
+    parser = create_parser()
+    args = parser.parse_args(argv)
+    return _run_pipeline_cli(args, parser)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

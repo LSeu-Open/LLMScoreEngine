@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Deque, Dict, List, Optional
 
 from ..state.store import SessionRecord, SessionStore
@@ -34,12 +34,15 @@ class SuggestionEngine:
         recent_limit: int = 25,
     ) -> None:
         self._store = session_store or SessionStore()
-        self._recent_actions: Deque[str] = deque(maxlen=recent_limit)
+        self._base_recent_limit = max(1, recent_limit)
+        self._recent_actions: Deque[str] = deque(maxlen=self._base_recent_limit)
         self._usage = Counter[str]()
         self._ephemeral: List[Suggestion] = []
         self._pinned: List[Suggestion] = []
         self._session_id: Optional[str] = None
         self._profile: Optional[str] = None
+        self._persistence_enabled = True
+        self._policy_max_entries: Optional[int] = None
 
     # ------------------------------------------------------------------
     # Session lifecycle
@@ -54,22 +57,26 @@ class SuggestionEngine:
 
         self._session_id = session_id
         self._profile = profile
-        self._recent_actions.clear()
+        self._recent_actions = deque(
+            maxlen=self._effective_recent_limit()
+        )
         self._usage.clear()
         self._pinned = []
+        self._refresh_policy_state()
         if not session_id:
             return
 
-        record = self._store.load(self._suggestion_record_id(session_id))
-        if record:
-            usage = record.data.get("usage", {})
-            recent = record.data.get("recent", [])
-            if isinstance(usage, dict):
-                self._usage.update({k: int(v) for k, v in usage.items()})
-            if isinstance(recent, list):
-                for action in recent:
-                    if isinstance(action, str):
-                        self._recent_actions.append(action)
+        if self._persistence_enabled:
+            record = self._store.load(self._suggestion_record_id(session_id))
+            if record:
+                usage = record.data.get("usage", {})
+                recent = record.data.get("recent", [])
+                if isinstance(usage, dict):
+                    self._usage.update({k: int(v) for k, v in usage.items()})
+                if isinstance(recent, list):
+                    for action in recent:
+                        if isinstance(action, str):
+                            self._recent_actions.append(action)
         self._load_pinned_suggestions()
 
     # ------------------------------------------------------------------
@@ -152,16 +159,17 @@ class SuggestionEngine:
         return f"ui.suggestions::{session_id}"
 
     def _persist(self) -> None:
-        if not self._session_id:
+        if not self._session_id or not self._persistence_enabled:
             return
         record = SessionRecord(
             identifier=self._suggestion_record_id(self._session_id),
             data={
                 "usage": dict(self._usage),
                 "recent": list(self._recent_actions),
-                "updated": datetime.utcnow().isoformat(),
+                "updated": datetime.now(UTC).isoformat(),
             },
             profile=self._profile,
+            category="suggestions",
         )
         try:
             self._store.save(record)
@@ -172,14 +180,16 @@ class SuggestionEngine:
         if not self._profile:
             return
         try:
-            records = self._store.list(profile=self._profile, limit=50)
+            records = self._store.list(
+                profile=self._profile,
+                category="pinned_context",
+                limit=50,
+            )
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Failed to load session records: %s", exc)
             return
         pinned: List[Suggestion] = []
         for record in records:
-            if not record.identifier.startswith("results.pin::"):
-                continue
             model = (
                 record.data.get("model")
                 if isinstance(record.data, dict)
@@ -197,6 +207,26 @@ class SuggestionEngine:
                 )
             )
         self._pinned = pinned
+
+    def _refresh_policy_state(self) -> None:
+        try:
+            registry = self._store.get_policy_registry()
+        except AttributeError:
+            self._persistence_enabled = True
+            self._policy_max_entries = None
+            return
+        policy = registry.resolve("suggestions")
+        self._policy_max_entries = policy.max_entries
+        self._persistence_enabled = (policy.max_entries or 0) != 0
+        effective_limit = self._effective_recent_limit()
+        if self._recent_actions.maxlen != effective_limit:
+            snapshot = list(self._recent_actions)[:effective_limit]
+            self._recent_actions = deque(snapshot, maxlen=effective_limit)
+
+    def _effective_recent_limit(self) -> int:
+        if self._policy_max_entries and self._policy_max_entries > 0:
+            return max(1, min(self._base_recent_limit, self._policy_max_entries))
+        return self._base_recent_limit
 
 
 __all__ = ["Suggestion", "SuggestionEngine"]

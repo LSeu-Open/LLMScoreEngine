@@ -1,0 +1,14 @@
+events:
+- prompt: llmscore exec automation.list
+  response: |-
+    {
+      "jobs": [
+        {
+          "id": "watch-models",
+          "action": "score.batch",
+          "paths": [
+            "models/"
+          ]
+        }
+      ]
+    }

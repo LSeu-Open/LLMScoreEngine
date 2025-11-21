@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Sequence
@@ -265,7 +265,7 @@ def _score_report_action_handler(**kwargs: Any) -> Dict[str, Any]:
 
     csv_report: Optional[Path] = None
     if csv_enabled:
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         csv_output = reports_path / f"{project_name}_report_{timestamp}.csv"
         csv_report = generate_csv_report(
             models=models,
@@ -631,7 +631,7 @@ def _score_batch(
     scoring_config = (
         _load_scoring_config(config_path) or default_scoring_config
     )
-    start = datetime.utcnow()
+    start = datetime.now(UTC)
     summary: List[Dict[str, Any]] = []
     for model in models:
         try:
@@ -654,7 +654,7 @@ def _score_batch(
                     "error": str(exc),
                 }
             )
-    elapsed = (datetime.utcnow() - start).total_seconds()
+    elapsed = (datetime.now(UTC) - start).total_seconds()
     successes = sum(1 for item in summary if item.get("status") == "success")
     return {
         "models": list(models),

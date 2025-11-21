@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 
@@ -42,7 +42,7 @@ class WorkflowDefinition:
     tags: Tuple[str, ...] = ()
     author: str | None = None
     created_at: str = field(
-        default_factory=lambda: datetime.utcnow().isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     source: str | None = None
 
@@ -78,7 +78,7 @@ class WorkflowDefinition:
             author=data.get("author"),
             created_at=data.get(
                 "created_at",
-                datetime.utcnow().isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
             source=data.get("source"),
         )

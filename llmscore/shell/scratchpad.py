@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Dict, Iterable, List, Optional, Sequence
 from uuid import uuid4
 
@@ -83,7 +83,7 @@ class ScratchpadManager:
         note = ScratchpadNote(
             identifier=str(uuid4()),
             content=content,
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             tags=tuple(tags),
         )
         self._notes.insert(0, note)
@@ -126,7 +126,7 @@ class ScratchpadManager:
             return
         payload = {
             "notes": [self._note_to_dict(note) for note in self._notes],
-            "updated": datetime.utcnow().isoformat(),
+            "updated": datetime.now(UTC).isoformat(),
         }
         record = SessionRecord(
             identifier=self._scratchpad_record_id(self._session_id),

@@ -37,7 +37,7 @@ def validator_instance():
     return validators.ModelDataValidator(scoring_config=default_scoring_config)
 
 @pytest.fixture
-def valid_model_data():
+def valid_model_data(monkeypatch):
     """Provides a deep copy of a valid model data structure for testing."""
     data = {
         "entity_benchmarks": {
@@ -52,11 +52,11 @@ def valid_model_data():
             "architecture": "dense",
             "param_count": 7000000000,
             "context_window": 8192,
-            "price_per_million_tokens_input": 1.5,
-            "price_per_million_tokens_output": 2.0
+            "input_price": 1.5,
+            "output_price": 2.0
         },
         "community_score": {
-            "lm_sys_arena_elo_rating": 1250,
+            "lm_sys_arena_score": 1250,
             "hf_score": 8.5,
             "hf_downloads_last_30_days": 50000,
             "hf_likes": 1500,
@@ -64,10 +64,22 @@ def valid_model_data():
         }
     }
     # Mock REQUIRED_SECTIONS based on this valid data for isolated testing
-    REQUIRED_SECTIONS['entity_benchmarks'] = ["artificial_analysis", "OpenCompass"]
-    REQUIRED_SECTIONS['dev_benchmarks'] = ["MMLU", "GSM-8K"]
-    REQUIRED_SECTIONS['model_specs'] = ["architecture", "param_count", "context_window", "price_per_million_tokens_input", "price_per_million_tokens_output"]
-    REQUIRED_SECTIONS['community_score'] = ["lm_sys_arena_elo_rating", "hf_score", "hf_downloads_last_30_days", "hf_likes", "model_age_months"]
+    monkeypatch.setitem(
+        REQUIRED_SECTIONS,
+        'entity_benchmarks',
+        ["artificial_analysis", "OpenCompass"],
+    )
+    monkeypatch.setitem(REQUIRED_SECTIONS, 'dev_benchmarks', ["MMLU", "GSM-8K"])
+    monkeypatch.setitem(
+        REQUIRED_SECTIONS,
+        'model_specs',
+        ["architecture", "param_count", "context_window", "input_price", "output_price"],
+    )
+    monkeypatch.setitem(
+        REQUIRED_SECTIONS,
+        'community_score',
+        ["lm_sys_arena_score", "hf_score", "hf_downloads_last_30_days", "hf_likes", "model_age_months"],
+    )
     
     return copy.deepcopy(data)
 
@@ -92,17 +104,17 @@ class TestModelDataValidator:
         print("\n--- Testing Benchmark Validation (Missing Field) ---")
         field_to_remove = 'OpenCompass'
         del valid_model_data['entity_benchmarks'][field_to_remove]
-        print(f"Testing with '{field_to_remove}' benchmark removed...")
-        with pytest.raises(exceptions.BenchmarkScoreError, match=f"Missing benchmark '{field_to_remove}'"):
+        print("Testing with '" + field_to_remove + "' benchmark removed...")
+        with pytest.raises(exceptions.BenchmarkScoreError, match="Missing benchmark '" + field_to_remove + "'"):
             validator_instance.validate_benchmarks(valid_model_data, 'entity_benchmarks', 'TestModel')
-        print(f"✅ Correctly raised BenchmarkScoreError for missing field.")
+        print("✅ Correctly raised BenchmarkScoreError for missing field.")
 
     def test_validate_benchmarks_invalid_type(self, valid_model_data, validator_instance):
         """Test that BenchmarkScoreError is raised for a non-numeric score."""
         print("\n--- Testing Benchmark Validation (Invalid Type) ---")
         invalid_value = "not-a-number"
         valid_model_data['dev_benchmarks']['MMLU'] = invalid_value
-        print(f"Testing with score set to: '{invalid_value}'...")
+        print("Testing with score set to: '" + invalid_value + "'...")
         with pytest.raises(exceptions.BenchmarkScoreError, match="Invalid score type for 'MMLU'"):
             validator_instance.validate_benchmarks(valid_model_data, 'dev_benchmarks', 'TestModel')
         print("✅ Correctly raised BenchmarkScoreError for invalid type.")
@@ -112,7 +124,7 @@ class TestModelDataValidator:
         print("\n--- Testing Benchmark Validation (Out of Bounds) ---")
         invalid_score = 101
         valid_model_data['dev_benchmarks']['GSM-8K'] = invalid_score
-        print(f"Testing with score set to: {invalid_score}...")
+        print("Testing with score set to: " + str(invalid_score) + "...")
         with pytest.raises(exceptions.BenchmarkScoreError, match="must be between 0 and 100"):
             validator_instance.validate_benchmarks(valid_model_data, 'dev_benchmarks', 'TestModel')
         print("✅ Correctly raised BenchmarkScoreError for out-of-bounds score.")
@@ -130,17 +142,17 @@ class TestModelDataValidator:
         print("\n--- Testing Model Specs Validation (Missing Field) ---")
         field_to_remove = 'param_count'
         del valid_model_data['model_specs'][field_to_remove]
-        print(f"Testing with '{field_to_remove}' spec removed...")
-        with pytest.raises(exceptions.ModelSpecificationError, match=f"Missing specification '{field_to_remove}'"):
+        print("Testing with '" + field_to_remove + "' spec removed...")
+        with pytest.raises(exceptions.ModelSpecificationError, match="Missing specification '" + field_to_remove + "'"):
             validators.ModelDataValidator.validate_model_specs(valid_model_data['model_specs'], 'TestModel')
-        print(f"✅ Correctly raised ModelSpecificationError for missing spec.")
+        print("✅ Correctly raised ModelSpecificationError for missing spec.")
 
     def test_validate_model_specs_invalid_architecture(self, valid_model_data):
         """Test that ModelSpecificationError is raised for an invalid architecture type."""
         print("\n--- Testing Model Specs Validation (Invalid Architecture Type) ---")
         invalid_arch = 123
         valid_model_data['model_specs']['architecture'] = invalid_arch
-        print(f"Testing with architecture set to: {invalid_arch}...")
+        print("Testing with architecture set to: " + str(invalid_arch) + "...")
         with pytest.raises(exceptions.ModelSpecificationError, match="Invalid type for 'architecture'"):
             validators.ModelDataValidator.validate_model_specs(valid_model_data['model_specs'], 'TestModel')
         print("✅ Correctly raised ModelSpecificationError for invalid architecture type.")
@@ -150,7 +162,7 @@ class TestModelDataValidator:
         print("\n--- Testing Model Specs Validation (Non-Positive Value) ---")
         invalid_value = 0
         valid_model_data['model_specs']['context_window'] = invalid_value
-        print(f"Testing with context_window set to: {invalid_value}...")
+        print("Testing with context_window set to: " + str(invalid_value) + "...")
         with pytest.raises(exceptions.ModelSpecificationError, match="must be positive"):
             validators.ModelDataValidator.validate_model_specs(valid_model_data['model_specs'], 'TestModel')
         print("✅ Correctly raised ModelSpecificationError for non-positive value.")
@@ -168,7 +180,7 @@ class TestModelDataValidator:
         print("\n--- Testing Community Score Validation (Out of Bounds) ---")
         invalid_score = 11
         valid_model_data['community_score']['hf_score'] = invalid_score
-        print(f"Testing with hf_score set to: {invalid_score}...")
+        print("Testing with hf_score set to: " + str(invalid_score) + "...")
         with pytest.raises(exceptions.CommunityScoreError, match="must be between 0 and 10"):
             validator_instance.validate_community_score(valid_model_data['community_score'], 'TestModel')
         print("✅ Correctly raised CommunityScoreError for out-of-bounds score.")
@@ -176,12 +188,12 @@ class TestModelDataValidator:
     def test_validate_community_score_missing_field(self, valid_model_data, validator_instance):
         """Test that CommunityScoreError is raised for a missing community score field."""
         print("\n--- Testing Community Score Validation (Missing Field) ---")
-        field_to_remove = 'lm_sys_arena_elo_rating'
+        field_to_remove = 'lm_sys_arena_score'
         del valid_model_data['community_score'][field_to_remove]
-        print(f"Testing with '{field_to_remove}' field removed...")
-        with pytest.raises(exceptions.CommunityScoreError, match=f"Missing community score field '{field_to_remove}'"):
+        print("Testing with '" + field_to_remove + "' field removed...")
+        with pytest.raises(exceptions.CommunityScoreError, match="Missing community score field '" + field_to_remove + "'"):
             validator_instance.validate_community_score(valid_model_data['community_score'], 'TestModel')
-        print(f"✅ Correctly raised CommunityScoreError for missing field.")
+        print("✅ Correctly raised CommunityScoreError for missing field.")
 
 # ------------------------------------------------------------------------------------------------
 # Tests for validate_model_data
@@ -200,7 +212,7 @@ def test_validate_model_data_missing_section(valid_model_data):
     print("\n--- Testing Full Validation (Missing Section) ---")
     section_to_remove = 'dev_benchmarks'
     del valid_model_data[section_to_remove]
-    print(f"Testing with top-level section '{section_to_remove}' removed...")
-    with pytest.raises(exceptions.ModelDataValidationError, match=f"Missing required section '{section_to_remove}'"):
+    print("Testing with top-level section '{0}' removed...".format(section_to_remove))
+    with pytest.raises(exceptions.ModelDataValidationError, match="Missing required section '{0}'".format(section_to_remove)):
         validators.validate_model_data(valid_model_data, "TestModel")
-    print(f"✅ Correctly raised ModelDataValidationError for missing section.") 
+    print("✅ Correctly raised ModelDataValidationError for missing section.") 

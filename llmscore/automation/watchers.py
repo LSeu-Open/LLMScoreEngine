@@ -61,7 +61,11 @@ class _ActionDispatchHandler(FileSystemEventHandler):
         self.job = job
         self.runner = runner
         self.notify = notify
-        self._lock = threading.Lock()
+        # ``on_any_event`` may call ``_flush`` while still holding this lock
+        # (when a burst of events reaches ``max_events_per_cycle``). A regular
+        # ``Lock`` would deadlock in that situation, so use ``RLock`` to allow
+        # the same thread to re-enter.
+        self._lock = threading.RLock()
         self._last_trigger: float = 0.0
         self._pending_events: List[str] = []
 
@@ -81,10 +85,16 @@ class _ActionDispatchHandler(FileSystemEventHandler):
     # Internal helpers
     # ------------------------------------------------------------------
     def _should_record(self, src_path: str) -> bool:
-        path_obj = Path(src_path)
         if not self.job.targets:
             return False
-        target = next(iter(self.job.targets))
+        path_obj = Path(src_path)
+        for target in self.job.targets:
+            if self._matches_target(target, path_obj):
+                return True
+        return False
+
+    @staticmethod
+    def _matches_target(target: WatchTarget, path_obj: Path) -> bool:
         for pattern in target.ignore_patterns:
             if path_obj.match(pattern):
                 return False

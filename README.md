@@ -21,24 +21,7 @@
 
 - [Table of Contents](#table-of-contents)
 - [Overview](#overview)
-- [Additional Tools](#additional-tools)
-  - [Fill Benchmark Pipeline](#fill-benchmark-pipeline)
-- [New features in Beta v0.6](#new-features-in-beta-v06)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Model Data Setup](#model-data-setup)
-  - [Models Data Format](#models-data-format)
-    - [Where to find the data ?](#where-to-find-the-data-)
-- [Usage](#usage)
-  - [Command-Line Usage](#command-line-usage)
-  - [Command-Line Options](#command-line-options)
-  - [IDE Usage](#ide-usage)
-- [Results Data Format](#results-data-format)
-- [License](#license)
-
-## Table of Contents
-
-- [Overview](#overview)
+- [New features in Beta v0.7](#new-features-in-beta-v07)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Model Data Setup](#model-data-setup)
@@ -50,6 +33,19 @@
   - [Command-Line Options](#command-line-options)
   - [IDE Usage](#ide-usage)
 - [Results Data Format](#results-data-format)
+- [Additional Tools](#additional-tools)
+  - [Fill Benchmark Pipeline](#fill-benchmark-pipeline)
+  - [Interactive Assistant Shell](#interactive-assistant-shell)
+    - [Key UX Enhancements](#key-ux-enhancements)
+    - [Accessibility \& Inclusivity](#accessibility--inclusivity)
+    - [Performance Monitoring](#performance-monitoring)
+    - [Configuration \& Flags](#configuration--flags)
+    - [Keyboard Shortcuts](#keyboard-shortcuts)
+    - [Documentation](#documentation)
+- [Testing Strategy \& Quality Assurance](#testing-strategy--quality-assurance)
+  - [Test Layers](#test-layers)
+  - [CI Pipeline](#ci-pipeline)
+  - [Running Tests Locally](#running-tests-locally)
 - [License](#license)
 
 ## Overview
@@ -69,39 +65,13 @@ Please note that this is a beta version and the scoring system is subject to cha
 
 To help us refine and improve LLMScoreEngine during this beta phase, we actively encourage user feedback, bug reports, and contributions to help us refine and improve LLMScoreEngine. Please feel free to [open an issue](https://github.com/LSeu-Open/LLMScoreEngine/issues) or [contribute](CONTRIBUTING.md) to the project. Make sure to respect the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Additional Tools
+## New features in Beta v0.7
 
-### Fill Benchmark Pipeline
-
-The `tools/fill-benchmark-pipeline/` directory contains an automated pipeline for filling model benchmark JSON files with data from multiple API sources. This tool helps prepare the model data files that are consumed by the main LLMScoreEngine.
-
-**Features:**
-- 🚀 **Interactive CLI** with guided prompts and automatic model detection
-- 🔧 **Multi-API Integration** (Artificial Analysis, Hugging Face)
-- ✅ **Input Validation** using Pydantic models
-- ⚡ **Rate Limiting & Retry Logic** with exponential backoff
-- 📊 **Rich Progress Reporting** and coverage statistics
-
-**Installation:**
-```bash
-pip install -e .[fill-benchmark-pipeline]
-```
-
-**Usage:**
-```bash
-# Interactive mode (recommended)
-python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py launch
-
-# Process with config file
-python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py --config config.yaml
-```
-
-For detailed usage instructions, see the [pipeline README](tools/fill-benchmark-pipeline/README.md).
-
-## New features in Beta v0.6
-
-- Updated technical score calculation to take into account the input and output price of the model.
-- Added a new CLI option to generate a graph report from the existing csv report.
+- **Scoring Engine Update**: Enhanced technical score calculation to include model input/output pricing.
+- **Rich Reporting**: New `--graph` CLI option to generate interactive HTML visualization reports from CSV results.
+- **Interactive Shell Overhaul**: A completely redesigned `llmscore shell` featuring a multi-pane layout, smart dock, command palette, and robust accessibility tools.
+- **Quality Assurance**: Introduced a comprehensive testing strategy and CI pipeline to enforce performance budgets and prevent regressions.
+- **Optimized Architecture**: Streamlined dependencies and updated documentation for a better developer experience.
 
 ## Project Structure
 
@@ -390,6 +360,12 @@ Use the `--all` flag to score all models present in the `Models` directory.
 python score_models.py --all
 ```
 
+To read models from a different folder, pass `--models-dir` alongside `--all` (or any explicit model list):
+
+```bash
+python score_models.py --all --models-dir CustomModels/
+```
+
 See the following section for more options to customize the behavior.
 
 ### Command-Line Options
@@ -398,7 +374,8 @@ You can customize the scoring process with the following optional flags:
 
 | Flag                 | Description                                                                                             | Example                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `--all`              | Score all models found in the `Models/` directory.                                                      | `python score_models.py --all`                      |
+| `--all`              | Score all models found in the `Models/` directory (or the folder set via `--models-dir`).               | `python score_models.py --all`                      |
+| `--models-dir PATH`  | Directory containing model JSON files (defaults to `./Models`).                                         | `python score_models.py --all --models-dir CustomModels/` |
 | `--quiet`            | Suppress all informational output and only print the final scores in the console. Useful for scripting. | `python score_models.py --all --quiet`              |
 | `--config <path>`    | Path to a custom Python configuration file to override the default scoring parameters.                  | `python score_models.py ModelName --config my_config.py` |
 | `--csv`              | Generate a CSV report from existing results.                                                            | `python score_models.py --csv`                      |
@@ -414,26 +391,15 @@ Results will be stored as JSON files in the `Results` directory, with the follow
 
 ```json
 {
-    "entity_benchmarks": {
-        "artificial_analysis": 60.22,
-        "OpenCompass": 86.7,
-        "LLM Explorer": 59.0,
-        "Livebench": 72.49,
-        "open_llm": null,
-        "UGI Leaderboard": 55.65,
-        "big_code_bench": 35.1,
-        "EvalPlus Leaderboard": null,
-        "Dubesord_LLM": 70.5,
-        "Open VLM": null
     "model_name": "Deepseek-R1",
     "scores": {
-        "entity_score": 18.84257142857143,
-        "dev_score": 23.063999999999997,
-        "external_score": 41.906571428571425,
+        "entity_score": 18.84,
+        "dev_score": 23.06,
         "community_score": 16.76,
-        "technical_score": 16.95878387917363,
+        "technical_score": 16.96,
         "final_score": 75.63,
-        "avg_performance": 73.21368421052631
+        "avg_performance": 73.21
+    },
     "entity_benchmarks": {
         "artificial_analysis": 60.22,
         "OpenCompass": 86.7,
@@ -447,161 +413,19 @@ Results will be stored as JSON files in the `Results` directory, with the follow
         "Open VLM": null
     },
     "dev_benchmarks": {
-        "MMLU": 90.8, 
-        "MMLU Pro": 84.0, 
-        "BigBenchHard": null,
-        "GPQA diamond": 71.5, 
-        "DROP": 92.2, 
-        "HellaSwag": null,
-        "Humanity's Last Exam": null,
-        "ARC-C": null,
-        "Wild Bench": null,
-        "MT-bench": null,
+        "MMLU": 90.8,
+        "MMLU Pro": 84.0,
+        "GPQA diamond": 71.5,
+        "DROP": 92.2,
         "IFEval": 83.3,
         "Arena-Hard": 92.3,
         "MATH": 97.3,
-        "GSM-8K": null,
         "AIME": 79.8,
-        "HumanEval": null,
-        "MBPP": null,
         "LiveCodeBench": 65.9,
         "Aider Polyglot": 53.3,
         "SWE-Bench": 49.2,
-        "SciCode": null,
-        "MGSM": null,
-        "MMMLU": null,
-        "C-Eval or CMMLU": 91.8,
-        "AraMMLu": null,
-        "LongBench": null,
-        "RULER 128K": null,
-        "RULER 32K": null,
-        "MTOB": null,
-        "BFCL": null,
-        "AgentBench": null,
-        "Gorilla Benchmark": null,
-        "ToolBench": null,
-        "MINT": null,
-        "MMMU": null,
-        "Mathvista": null,
-        "ChartQA": null,
-        "DocVQA": null,
-        "AI2D": null
+        "C-Eval or CMMLU": 91.8
     },
-    "dev_benchmarks": {
-        "MMLU": 90.8, 
-        "MMLU Pro": 84.0, 
-        "BigBenchHard": null,
-        "GPQA diamond": 71.5, 
-        "DROP": 92.2, 
-        "HellaSwag": null,
-        "Humanity's Last Exam": null,
-        "ARC-C": null,
-        "Wild Bench": null,
-        "MT-bench": null,
-        "IFEval": 83.3,
-        "Arena-Hard": 92.3,
-        "MATH": 97.3,
-        "GSM-8K": null,
-        "AIME": 79.8,
-        "HumanEval": null,
-        "MBPP": null,
-        "LiveCodeBench": 65.9,
-        "Aider Polyglot": 53.3,
-        "SWE-Bench": 49.2,
-        "SciCode": null,
-        "MGSM": null,
-        "MMMLU": null,
-        "C-Eval or CMMLU": 91.8,
-        "AraMMLu": null,
-        "LongBench": null,
-        "RULER 128K": null,
-        "RULER 32K": null,
-        "MTOB": null,
-        "BFCL": null,
-        "AgentBench": null,
-        "Gorilla Benchmark": null,
-        "ToolBench": null,
-        "MINT": null,
-        "MMMU": null,
-        "Mathvista": null,
-        "ChartQA": null,
-        "DocVQA": null,
-        "AI2D": null
-    },
-    "community_score": {
-        "lm_sys_arena_score": 1389,
-        "hf_score": 8.79
-    },
-    "model_specs": {
-        "input_price": 0.55,
-        "output_price": 2.19,
-        "context_window": 128000,
-        "param_count": 685,
-        "architecture": "moe"
-    "input_data": {
-        "entity_benchmarks": {
-            "artificial_analysis": 0.6022,
-            "OpenCompass": 0.867,
-            "LLM Explorer": 0.59,
-            "Livebench": 0.7249,
-            "open_llm": null,
-            "UGI Leaderboard": 0.5565,
-            "big_code_bench": 0.35100000000000003,
-            "EvalPlus Leaderboard": null,
-            "Dubesord_LLM": 0.705,
-            "Open VLM": null
-        },
-        "dev_benchmarks": {
-            "MMLU": 0.9079999999999999,
-            "MMLU Pro": 0.84,
-            "BigBenchHard": null,
-            "GPQA diamond": 0.715,
-            "DROP": 0.922,
-            "HellaSwag": null,
-            "Humanity's Last Exam": null,
-            "ARC-C": null,
-            "Wild Bench": null,
-            "MT-bench": null,
-            "IFEval": 0.833,
-            "Arena-Hard": 0.9229999999999999,
-            "MATH": 0.973,
-            "GSM-8K": null,
-            "AIME": 0.7979999999999999,
-            "HumanEval": null,
-            "MBPP": null,
-            "LiveCodeBench": 0.659,
-            "Aider Polyglot": 0.5329999999999999,
-            "SWE-Bench": 0.49200000000000005,
-            "SciCode": null,
-            "MGSM": null,
-            "MMMLU": null,
-            "C-Eval or CMMLU": 0.9179999999999999,
-            "AraMMLu": null,
-            "LongBench": null,
-            "RULER 128K": null,
-            "RULER 32K": null,
-            "MTOB": null,
-            "BFCL": null,
-            "AgentBench": null,
-            "Gorilla Benchmark": null,
-            "ToolBench": null,
-            "MINT": null,
-            "MMMU": null,
-            "Mathvista": null,
-            "ChartQA": null,
-            "DocVQA": null,
-            "AI2D": null
-        },
-        "community_score": {
-            "lm_sys_arena_score": 1363,
-            "hf_score": 9.5
-        },
-        "model_specs": {
-            "price": 0.55,
-            "context_window": 128000,
-            "param_count": 685,
-            "architecture": "moe"
-        }
     "community_score": {
         "lm_sys_arena_score": 1389,
         "hf_score": 8.79
@@ -615,6 +439,121 @@ Results will be stored as JSON files in the `Results` directory, with the follow
     }
 }
 ```
+## Additional Tools
+
+### Fill Benchmark Pipeline
+
+The `tools/fill-benchmark-pipeline/` directory contains an automated pipeline for filling model benchmark JSON files with data from multiple API sources. This tool helps prepare the model data files that are consumed by the main LLMScoreEngine.
+
+**Features:**
+- 🚀 **Interactive CLI** with guided prompts and automatic model detection
+- 🔧 **Multi-API Integration** (Artificial Analysis, Hugging Face)
+- ✅ **Input Validation** using Pydantic models
+- ⚡ **Rate Limiting & Retry Logic** with exponential backoff
+- 📊 **Rich Progress Reporting** and coverage statistics
+
+**Installation:**
+```bash
+pip install -e .[fill-benchmark-pipeline]
+```
+
+**Usage:**
+```bash
+# Interactive mode (recommended)
+python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py launch
+
+# Process with config file
+python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py --config config.yaml
+```
+
+For detailed usage instructions, see the [pipeline README](docs/FILL_BENCH_README.md).
+
+### Interactive Assistant Shell
+
+The **LLMScore Shell** (`llmscore shell`) has undergone a comprehensive UI/UX overhaul to support daily evaluation workflows with a modern, multi-pane console experience. This unified interface brings together execution, monitoring, and context management into a single ergonomic workspace.
+
+#### Key UX Enhancements
+
+- **Multi-Pane Workspace**: A responsive 3-column layout featuring:
+  - **Command Stream**: The central hub for execution and logs.
+  - **Timeline Pane**: A chronological feed of events, actions, and system state.
+  - **Context Pane**: Persistent view of active configurations, pinned metrics, and scratchpad notes.
+- **Smart Dock**: A fixed, always-visible input area that anchors the bottom of the screen, hosting the prompt, autocomplete suggestions, and quick-action status chips.
+- **Command Palette 2.0**: A keyboard-centric (`Ctrl+K`) palette for quick navigation, command execution, and workspace management, featuring fuzzy search and grouped actions.
+- **Structured Output Cards**: Rich, interactive result cards that replace raw text logs, offering organized summaries, copy-to-clipboard buttons, and export options.
+
+#### Accessibility & Inclusivity
+
+We are committed to a shell that works for everyone. Beta v0.7 introduces:
+- **Deterministic Focus Order**: Cycle seamlessly between panes (Timeline → Context → Command → Dock) using `Ctrl+P` with screen-reader announcements.
+- **Reduced Motion Mode**: A dedicated configuration flag to disable spinners and sliding animations for a static, distraction-free experience.
+- **Color-Blind Support**: High-contrast palette tokens ensuring readability and distinction for status indicators and charts.
+
+#### Performance Monitoring
+
+To ensure the shell remains responsive, we've integrated a **Performance Monitor** that tracks render loops and command latency against defined budgets.
+- **Budgets**: Enforced limits for key interactions (e.g., 150ms command loop).
+- **Reporting**: The `performance` command provides real-time samples and violation summaries.
+- **CI Integration**: Performance checks run automatically to prevent regression.
+
+#### Configuration & Flags
+
+Enable the new experience in your configuration (or pass via `ShellConfig`):
+
+```toml
+[shell]
+enable_layout_v2 = true          # Enable the multi-pane layout
+use_output_cards = true          # Use structured rich-text cards
+palette_autocomplete = true      # Enable inline palette suggestions
+reduced_motion = false           # Disable animations
+color_blind_mode = false         # Use high-contrast theme
+performance_monitor_enabled = true # Track render performance
+```
+#### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+K` | Open Command Palette |
+| `Ctrl+P` | Cycle Pane Focus (Timeline → Context → Stream → Dock) |
+| `Ctrl+T` | Toggle Timeline Pane |
+| `Ctrl+C` | Toggle Context Pane |
+| `Ctrl+Shift+L` | Clear Screen |
+
+#### Documentation
+
+For a complete guide on commands, layout configuration, and troubleshooting, see the [Shell Documentation](docs/SHELL_README.md).
+
+## Testing Strategy & Quality Assurance
+
+We employ a multi-layer testing strategy to ensure stability, accuracy, and performance across the LLMScoreEngine.
+
+### Test Layers
+1. **Unit & Contract**: Validates business logic, schemas, and action handlers in isolation.
+2. **Integration**: Verifies interactions with the file system, session store, and external APIs.
+3. **End-to-End (CLI)**: Validates full user flows, including `shell`, `run`, and `exec` modes.
+4. **UI Snapshots**: Regression testing for the Shell UI using `pytest-regressions` to ensure layout stability and visual consistency.
+5. **Performance**: Smoke tests for critical paths (`score.batch`, `results.leaderboard`) and concurrency stress tests for automation.
+
+### CI Pipeline
+Our GitHub Actions workflow (`perf-accessibility.yml`) enforces quality gates on every push:
+- **Static Analysis**: `ruff`, `mypy`.
+- **Test Suite**: Runs the full `pytest` suite, including legacy regressions and new shell UI tests.
+- **Performance Gates**: Checks for runtime regressions (>20%) and memory leaks.
+- **Accessibility**: Verifies focus order and reduced-motion compliance.
+
+### Running Tests Locally
+```bash
+# Run fast unit tests
+pytest tests/scoring tests/data tests/config
+
+# Run Shell UI regression tests
+pytest tests/shell/test_layout.py tests/shell/test_output_cards.py --regression-fail-under=100
+
+# Run full suite
+pytest
+```
+
+For a deep dive into our testing methodology, please refer to [dev_docs/TESTING.md](dev_docs/TESTING.md).
 
 ## License
 

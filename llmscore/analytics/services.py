@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -46,7 +46,7 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _stat_timestamp(path: Path) -> datetime:
-    return datetime.fromtimestamp(path.stat().st_mtime)
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
 
 
 def _default_results_dir(path: Optional[Path | str]) -> Path:
@@ -296,11 +296,12 @@ class ResultsAnalytics:
         record = SessionRecord(
             identifier=f"results.pin::{model}",
             profile=profile,
+            category="pinned_context",
             data={
                 "model": model,
                 "note": note,
                 "path": payload.get("path"),
-                "pinned_at": datetime.utcnow().isoformat(),
+                "pinned_at": datetime.now(UTC).isoformat(),
             },
         )
         saved = self.session_store.save(record)

@@ -6,4 +6,6 @@ __all__ = [
     "suggestions",
     "scratchpad",
     "wizard",
+    "layout",
+    "components",
 ]
