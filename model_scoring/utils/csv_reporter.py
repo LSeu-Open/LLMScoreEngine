@@ -1,7 +1,23 @@
+# ------------------------------------------------------------------------------------------------
+# License
+# ------------------------------------------------------------------------------------------------
+
+# Copyright (c) 2025 LSeu-Open
+# 
+# This code is licensed under the MIT License.
+# See LICENSE file in the root directory
+
+# ------------------------------------------------------------------------------------------------
+# Description
+# ------------------------------------------------------------------------------------------------
+
 """Utilities for exporting scoring results to CSV reports."""
 
-from __future__ import annotations
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
 import csv
 import json
 import logging
@@ -105,8 +121,16 @@ def _build_row(
     models_dir: Path,
 ) -> ReportRow:
     model_name = _model_name_from_result(result_path, result_payload)
-    model_payload = _load_json(models_dir / f"{model_name}.json") or {}
-    model_specs: Mapping[str, Any] = model_payload.get("model_specs", {})
+    
+    # Prefer model_specs from the result payload if available
+    input_data = result_payload.get("input_data", {})
+    model_specs = input_data.get("model_specs", {})
+    
+    # Fallback to loading from models_dir if not in result payload
+    if not model_specs:
+        model_payload = _load_json(models_dir / f"{model_name}.json") or {}
+        model_specs = model_payload.get("model_specs", {})
+
     scores: Mapping[str, Any] = result_payload.get("scores", {})
 
     input_price = model_specs.get("input_price")
