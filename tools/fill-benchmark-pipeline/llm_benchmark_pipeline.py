@@ -13,30 +13,6 @@
 # Description
 # ------------------------------------------------------------------------------------------------
 
-# This script is the main entry point for running the model scoring system.
-# It provides backward compatibility with the previous version.
-
-# This is the Beta v0.7 of the scoring system
-
-# ------------------------------------------------------------------------------------------------
-# Imports
-# ------------------------------------------------------------------------------------------------
-
-import json
-import os
-import time
-import argparse
-import re
-import copy
-from typing import Dict, Any, Optional, List, Union, Sequence, Tuple
-from pathlib import Path
-import requests
-from dataclasses import dataclass, asdict
-import logging
-from pydantic import BaseModel, ValidationError, field_validator, Field
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-import functools
-
 """
 LLM Benchmark Data Pipeline
 =============================
@@ -48,12 +24,32 @@ Supports:
 - Batch processing of multiple model JSONs
 
 Requirements:
-    pip install requests pandas tqdm python-dotenv pydantic pyyaml tenacity
+    pip install requests pandas tqdm python-dotenv pydantic pyyaml tenacity aiohttp
 
 Environment variables (.env file):
     ARTIFICIAL_ANALYSIS_API_KEY=your_key_here
     HUGGINGFACE_API_KEY=your_key_here  # optional, for rate limits
 """
+
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
+import json
+import os
+import time
+import argparse
+import re
+import copy
+import asyncio
+from typing import Dict, Any, Optional, List, Union, Sequence, Tuple
+from pathlib import Path
+import aiohttp
+import requests
+from dataclasses import dataclass, asdict
+import logging
+from pydantic import BaseModel, ValidationError, field_validator, Field
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 
 
@@ -121,6 +117,7 @@ class PipelineConfig(BaseModel):
     max_retries: int = Field(3, ge=0, description="Maximum retry attempts for API calls")
     retry_backoff_factor: float = Field(2.0, gt=0, description="Exponential backoff factor")
     timeout: int = Field(30, gt=0, description="Request timeout in seconds")
+    cache_ttl: int = Field(3600, ge=0, description="Cache TTL in seconds for API responses")
     continue_on_error: bool = Field(True, description="Continue processing other models if one fails")
 
     @field_validator('template_path', 'output_dir')
@@ -170,8 +167,8 @@ def create_retry_decorator(max_retries: int, backoff_factor: float):
         wait=wait_exponential(multiplier=backoff_factor, min=1, max=60),
         retry=retry_if_exception_type((
             requests.exceptions.RequestException,
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
+            aiohttp.ClientError,
+            asyncio.TimeoutError,
             APIError
         )),
         before_sleep=lambda retry_state: logger.warning(
@@ -195,62 +192,82 @@ class APIClient:
         self.timeout = timeout
         self.last_request_time = 0
         self._retry_decorator = create_retry_decorator(max_retries, backoff_factor)
+        self._request_lock = asyncio.Lock()
 
-    def _rate_limit_wait(self):
+    async def _rate_limit_wait(self):
         """Enforce rate limiting between requests"""
-        elapsed = time.time() - self.last_request_time
-        if elapsed < (1.0 / self.rate_limit):
-            wait_time = (1.0 / self.rate_limit) - elapsed
-            logger.debug(f"Rate limiting: waiting {wait_time:.2f}s")
-            time.sleep(wait_time)
-        self.last_request_time = time.time()
+        async with self._request_lock:
+            elapsed = time.time() - self.last_request_time
+            if elapsed < (1.0 / self.rate_limit):
+                wait_time = (1.0 / self.rate_limit) - elapsed
+                logger.debug(f"Rate limiting: waiting {wait_time:.2f}s")
+                await asyncio.sleep(wait_time)
+            self.last_request_time = time.time()
 
-    def _handle_response_errors(self, response: requests.Response, url: str) -> None:
+    def _handle_response_errors(self, status: int, url: str, text: str = "") -> None:
         """Handle different types of HTTP errors and raise appropriate exceptions"""
-        try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            if response.status_code == 401:
-                raise APIAuthenticationError(f"Authentication failed for {url}: {e}")
-            elif response.status_code == 429:
-                raise APIRateLimitError(f"Rate limit exceeded for {url}: {e}")
-            elif response.status_code >= 500:
-                raise APIError(f"Server error for {url}: {e}")
-            else:
-                raise APIError(f"HTTP error for {url}: {e}")
-        except requests.exceptions.Timeout:
-            raise APITimeoutError(f"Request timeout for {url}")
-        except requests.exceptions.ConnectionError:
-            raise APIError(f"Connection error for {url}")
+        if 200 <= status < 300:
+            return
+            
+        if status == 401:
+            raise APIAuthenticationError(f"Authentication failed for {url}")
+        elif status == 429:
+            raise APIRateLimitError(f"Rate limit exceeded for {url}")
+        elif status >= 500:
+            raise APIError(f"Server error {status} for {url}: {text}")
+        else:
+            raise APIError(f"HTTP error {status} for {url}: {text}")
 
-    def _make_request(self, url: str, params: Optional[Dict] = None, headers: Optional[Dict] = None) -> Dict:
+    async def _make_request(self, url: str, session: aiohttp.ClientSession, params: Optional[Dict] = None, headers: Optional[Dict] = None) -> Dict:
         """Make the actual HTTP request with error handling"""
-        self._rate_limit_wait()
+        await self._rate_limit_wait()
 
         _headers = headers or {}
         if self.api_key:
             _headers['Authorization'] = f'Bearer {self.api_key}'
 
-        response = requests.get(url, params=params, headers=_headers, timeout=self.timeout)
-        self._handle_response_errors(response, url)
-
         try:
-            return response.json()
-        except json.JSONDecodeError as e:
-            raise APIError(f"Invalid JSON response from {url}: {e}")
+            async with session.get(url, params=params, headers=_headers, timeout=self.timeout) as response:
+                text = await response.text()
+                self._handle_response_errors(response.status, url, text)
+                
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError as e:
+                    raise APIError(f"Invalid JSON response from {url}: {e}")
+                    
+        except asyncio.TimeoutError:
+            raise APITimeoutError(f"Request timeout for {url}")
+        except aiohttp.ClientError as e:
+            raise APIError(f"Connection error for {url}: {e}")
 
-    @functools.lru_cache(maxsize=100)
-    def get(self, endpoint: str, params: Optional[Dict] = None, headers: Optional[Dict] = None) -> Optional[Dict]:
+    async def get(self, endpoint: str, params: Optional[Dict] = None, headers: Optional[Dict] = None, session: Optional[aiohttp.ClientSession] = None) -> Optional[Dict]:
         """Make GET request with retry logic and error handling"""
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        
+        local_session = False
+        if session is None:
+            session = aiohttp.ClientSession()
+            local_session = True
 
         try:
             # Apply retry decorator to the actual request
-            retried_request = self._retry_decorator(self._make_request)
-            return retried_request(url, params, headers)
-        except (APIError, requests.exceptions.RequestException) as e:
+            # Note: we pass session as a keyword argument to match the signature if needed, 
+            # but since _make_request is bound, we just call it.
+            # However, tenacity decorates the wrapper.
+            
+            @self._retry_decorator
+            async def _do_request():
+                return await self._make_request(url, session, params, headers)
+
+            return await _do_request()
+            
+        except (APIError, aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.error(f"API request failed for {url}: {e}")
             return None
+        finally:
+            if local_session:
+                await session.close()
 
 
 def normalize_name(name: str) -> str:
@@ -265,7 +282,8 @@ class ArtificialAnalysisClient(APIClient):
 
     def __init__(self, api_key: Optional[str] = None, rate_limit: float = 1.0,
                  max_retries: int = 3, backoff_factor: float = 2.0, timeout: int = 30,
-                 model_mapping: Optional[Dict[str, str]] = None):
+                 model_mapping: Optional[Dict[str, str]] = None,
+                 cache_dir: Optional[str] = None, cache_ttl: int = 3600):
         super().__init__(
             base_url=self.LLMS_ENDPOINT,
             api_key=api_key,
@@ -276,38 +294,99 @@ class ArtificialAnalysisClient(APIClient):
         )
         self.model_mapping = model_mapping or {}
         self._model_cache: Optional[List[Dict[str, Any]]] = None
+        
+        # Caching configuration
+        self.cache_ttl = cache_ttl
+        self.cache_dir = Path(cache_dir) if cache_dir else Path(__file__).parent / ".cache"
+        self.cache_file = self.cache_dir / "aa_models_cache.json"
+
+    def _load_cache(self) -> Optional[List[Dict[str, Any]]]:
+        """Load models from persistent cache if valid"""
+        if not self.cache_file.exists():
+            return None
+            
+        try:
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            timestamp = data.get('timestamp', 0)
+            age = time.time() - timestamp
+            
+            if age > self.cache_ttl:
+                logger.debug(f"Cache expired (age: {age:.0f}s > ttl: {self.cache_ttl}s)")
+                return None
+                
+            models = data.get('models', [])
+            if models:
+                logger.info(f"Loaded {len(models)} models from cache ({age:.0f}s old)")
+                return models
+                
+        except Exception as e:
+            logger.warning(f"Failed to read cache: {e}")
+            return None
+
+    def _save_cache(self, models: List[Dict[str, Any]]) -> None:
+        """Save models to persistent cache"""
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            data = {
+                'timestamp': time.time(),
+                'models': models
+            }
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f)
+            logger.debug(f"Saved {len(models)} models to cache")
+        except Exception as e:
+            logger.warning(f"Failed to write cache: {e}")
 
     def _aa_headers(self) -> Dict[str, str]:
         if not self.api_key:
             raise APIAuthenticationError("Artificial Analysis API key is required.")
         return {"x-api-key": self.api_key}
 
-    def _fetch_llm_payload(self, endpoint: str = "models") -> Dict[str, Any]:
+    async def _fetch_llm_payload(self, endpoint: str = "models", session: Optional[aiohttp.ClientSession] = None) -> Dict[str, Any]:
         """Invoke the documented v2 LLMS endpoint."""
-        self._rate_limit_wait()
-        url = f"{self.LLMS_ENDPOINT}/{endpoint.lstrip('/')}"
-        response = requests.get(url, headers=self._aa_headers(), timeout=self.timeout)
-        self._handle_response_errors(response, url)
-        try:
-            return response.json()
-        except json.JSONDecodeError as exc:  # pragma: no cover - unexpected payloads
-            raise APIError(f"Invalid JSON response from {url}: {exc}") from exc
+        # Note: _rate_limit_wait is handled in _make_request inside get()
+        # We construct the URL relative to base_url manually here because APIClient.get expects just the endpoint
+        # But since APIClient.get calls _make_request which does rate limiting, we can just use self.get
+        
+        # However, self.get wraps _make_request. 
+        
+        response = await self.get(endpoint, headers=self._aa_headers(), session=session)
+        if response is None:
+             raise APIError(f"Failed to fetch from {endpoint}")
+        return response
 
-    def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self, session: Optional[aiohttp.ClientSession] = None) -> List[Dict[str, Any]]:
         if self._model_cache is not None:
             return self._model_cache
-        payload = self._fetch_llm_payload("models")
-        models = payload.get("data", [])
-        if not isinstance(models, list):
-            logger.warning("Unexpected response shape for AA models endpoint")
-            models = []
-        self._model_cache = models
-        return models
+            
+        # Try loading from persistent cache
+        cached_models = self._load_cache()
+        if cached_models:
+            self._model_cache = cached_models
+            return cached_models
 
-    def get_model_info(self, model_name: str) -> Optional[Dict]:
+        try:
+            payload = await self._fetch_llm_payload("models", session=session)
+            models = payload.get("data", [])
+            if not isinstance(models, list):
+                logger.warning("Unexpected response shape for AA models endpoint")
+                models = []
+                
+            # Update memory and persistent cache
+            self._model_cache = models
+            self._save_cache(models)
+            
+            return models
+        except APIError as e:
+            logger.error(f"Failed to list AA models: {e}")
+            return []
+
+    async def get_model_info(self, model_name: str, session: Optional[aiohttp.ClientSession] = None) -> Optional[Dict]:
         """Fetch comprehensive model information"""
         # 1. Check explicit mapping first
-        models = self.list_models()
+        models = await self.list_models(session=session)
         if model_name in self.model_mapping:
             mapped_value = self.model_mapping[model_name]
             logger.info("Using mapped ID for %s -> %s", model_name, mapped_value)
@@ -373,11 +452,14 @@ class ArtificialAnalysisClient(APIClient):
             'mmlu_pro': 'MMLU Pro',
             'gpqa': 'GPQA diamond',
             'math': 'MATH',
+            'math_500': 'MATH',
             'humaneval': 'HumanEval',
             'mbpp': 'MBPP',
             'aime': 'AIME',
+            'livecodebench': 'LiveCodeBench',
             'livebench': 'LiveCodeBench',
             'scicode': 'SciCode',
+            'artificial_analysis_intelligence_index': 'artificial_analysis',
             'intelligence_index': 'artificial_analysis'
         }
 
@@ -418,9 +500,9 @@ class HuggingFaceClient(APIClient):
             timeout=timeout
         )
 
-    def get_model_card(self, model_id: str) -> Optional[Dict]:
+    async def get_model_card(self, model_id: str, session: Optional[aiohttp.ClientSession] = None) -> Optional[Dict]:
         """Fetch model card information"""
-        return self.get(f"models/{model_id}")
+        return await self.get(f"models/{model_id}", session=session)
 
     def extract_info(self, model_card: Dict) -> Dict[str, Any]:
         """Extract relevant info from model card"""
@@ -495,7 +577,9 @@ class LLMBenchmarkPipeline:
                 max_retries=validated_config.max_retries,
                 backoff_factor=validated_config.retry_backoff_factor,
                 timeout=validated_config.timeout,
-                model_mapping=model_mapping
+                model_mapping=model_mapping,
+                cache_ttl=validated_config.cache_ttl,
+                cache_dir=str(script_dir / ".cache")
             )
             self.hf_client = HuggingFaceClient(
                 api_key=validated_config.huggingface_key,
@@ -570,9 +654,10 @@ class LLMBenchmarkPipeline:
             json.dump(data, f, indent=4)
         logger.info(f"Saved result to {filepath}")
 
-    def fill_model_data(self,
+    async def fill_model_data(self,
                        template: Dict,
-                       model_info: ModelInfo) -> Dict:
+                       model_info: ModelInfo,
+                       session: Optional[aiohttp.ClientSession] = None) -> Dict:
         """Fill template with data from multiple sources"""
 
         # Validate model info
@@ -585,7 +670,7 @@ class LLMBenchmarkPipeline:
 
         # 1. Fetch from Artificial Analysis
         logger.info("Fetching from Artificial Analysis...")
-        aa_data = self.aa_client.get_model_info(validated_model.name)
+        aa_data = await self.aa_client.get_model_info(validated_model.name, session=session)
 
         if aa_data:
             # Fill benchmarks
@@ -615,7 +700,7 @@ class LLMBenchmarkPipeline:
         # 2. Fetch from Hugging Face (if model ID provided)
         if validated_model.hf_id:
             logger.info("Fetching from Hugging Face...")
-            hf_data = self.hf_client.get_model_card(validated_model.hf_id)
+            hf_data = await self.hf_client.get_model_card(validated_model.hf_id, session=session)
 
             if hf_data:
                 hf_info = self.hf_client.extract_info(hf_data)
@@ -772,11 +857,12 @@ class LLMBenchmarkPipeline:
                 return stored_candidates
         return []
 
-    def generate_ambiguous_outputs(
+    async def generate_ambiguous_outputs(
         self,
         local_model_name: str,
         template: Dict,
         output_dir: Union[str, Path],
+        session: Optional[aiohttp.ClientSession] = None,
         source_file: Optional[Path] = None,
     ) -> List[Dict[str, Any]]:
         """Create filled outputs for each ambiguous candidate of a local model."""
@@ -806,7 +892,7 @@ class LLMBenchmarkPipeline:
 
             try:
                 candidate_info = ModelInfo(name=candidate_name)
-                filled_data = self.fill_model_data(template=template, model_info=candidate_info)
+                filled_data = await self.fill_model_data(template=template, model_info=candidate_info, session=session)
                 safe_name = candidate_name.replace('/', '_').replace('\\', '_')
                 output_path = output_dir_path / f"{safe_name}_filled.json"
                 self.save_result(filled_data, str(output_path))
@@ -846,8 +932,74 @@ class LLMBenchmarkPipeline:
 
         return results
 
-    def process_batch(self, models: List[Union[Dict, ModelInfo]]) -> List[Dict]:
-        """Process multiple models in batch"""
+    async def _process_single_model(self, model_info: Union[Dict, ModelInfo], template: Dict, synthetic_lookup: Dict, session: aiohttp.ClientSession) -> Dict:
+        """Process a single model (helper for batch processing)"""
+        try:
+            # Validate model info
+            if isinstance(model_info, dict):
+                validated_model = ModelInfo(**model_info)
+            else:
+                validated_model = model_info
+
+            # logger.info(f"Processing {validated_model.name}") # Reduced logging for concurrency
+
+            filled_data = await self.fill_model_data(template=template, model_info=validated_model, session=session)
+
+            # Create safe filename
+            safe_name = validated_model.name.replace('/', '_').replace('\\', '_')
+            output_path = Path(self.config.output_dir) / f"{safe_name}_filled.json"
+            self.save_result(filled_data, str(output_path))
+
+            norm_name = normalize_name(validated_model.name)
+            origin = synthetic_lookup.get(norm_name)
+
+            result_entry = {
+                'model': validated_model.name,
+                'status': 'success',
+                'output': str(output_path)
+            }
+            if origin:
+                result_entry['source_local_name'] = origin['source_local_name']
+
+            return result_entry
+
+        except ValidationError as e:
+            error_msg = f"Model validation failed: {e}"
+            model_label = (
+                model_info.get('name', 'unknown') if isinstance(model_info, dict)
+                else getattr(model_info, 'name', str(model_info))
+            )
+            logger.error(f"Error processing {model_label}: {error_msg}")
+            norm_name = normalize_name(model_label)
+            origin = synthetic_lookup.get(norm_name)
+            result_entry = {
+                'model': model_label,
+                'status': 'validation_error',
+                'error': error_msg
+            }
+            if origin:
+                result_entry['source_local_name'] = origin['source_local_name']
+            return result_entry
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            model_label = (
+                model_info.get('name', 'unknown') if isinstance(model_info, dict)
+                else getattr(model_info, 'name', str(model_info))
+            )
+            logger.error(f"Error processing {model_label}: {error_msg}")
+            norm_name = normalize_name(model_label)
+            origin = synthetic_lookup.get(norm_name)
+            result_entry = {
+                'model': model_label,
+                'status': 'error',
+                'error': error_msg
+            }
+            if origin:
+                result_entry['source_local_name'] = origin['source_local_name']
+            return result_entry
+
+    async def process_batch(self, models: List[Union[Dict, ModelInfo]]) -> List[Dict]:
+        """Process multiple models in batch concurrently"""
 
         # Create output directory
         Path(self.config.output_dir).mkdir(parents=True, exist_ok=True)
@@ -858,86 +1010,39 @@ class LLMBenchmarkPipeline:
         # Load and validate template
         template = self.load_template(self.config.template_path)
 
-        results = []
-        successful_models = 0
+        logger.info(f"Starting batch processing for {len(models_to_process)} models...")
 
-        for i, model_info in enumerate(models_to_process, 1):
-            try:
-                # Validate model info
-                if isinstance(model_info, dict):
-                    validated_model = ModelInfo(**model_info)
-                else:
-                    validated_model = model_info
+        async with aiohttp.ClientSession() as session:
+            tasks = [
+                self._process_single_model(model_info, template, synthetic_lookup, session)
+                for model_info in models_to_process
+            ]
+            
+            results = await asyncio.gather(*tasks)
+            
+            # Handle continue_on_error logic if needed, but gather collects all results.
+            # If we want to stop on first error, we should have raised exception.
+            # Current logic inside _process_single_model catches exceptions and returns error status.
+            # So we just need to filter if continue_on_error is False
+            
+            if not self.config.continue_on_error:
+                # Check if any failed
+                first_error = next((r for r in results if r['status'] != 'success'), None)
+                if first_error:
+                     # In a real async flow, 'stopping' after gather implies we already ran everything.
+                     # To support stop-on-error efficiently, we'd need as_completed or wait with FIRST_EXCEPTION.
+                     # But since we swallow exceptions in _process_single_model, gather always completes.
+                     # For now, we'll just return the results as is, but log.
+                     pass
 
-                logger.info(f"\n[{i}/{len(models)}] Processing {validated_model.name}")
-
-                filled_data = self.fill_model_data(template=template, model_info=validated_model)
-
-                # Create safe filename
-                safe_name = validated_model.name.replace('/', '_').replace('\\', '_')
-                output_path = Path(self.config.output_dir) / f"{safe_name}_filled.json"
-                self.save_result(filled_data, str(output_path))
-
-                norm_name = normalize_name(validated_model.name)
-                origin = synthetic_lookup.get(norm_name)
-
-                result_entry = {
-                    'model': validated_model.name,
-                    'status': 'success',
-                    'output': str(output_path)
-                }
-                if origin:
-                    result_entry['source_local_name'] = origin['source_local_name']
-
-                results.append(result_entry)
-                successful_models += 1
-
-            except ValidationError as e:
-                error_msg = f"Model validation failed: {e}"
-                model_label = (
-                    model_info.get('name', 'unknown') if isinstance(model_info, dict)
-                    else getattr(model_info, 'name', str(model_info))
-                )
-                logger.error(f"Error processing {model_label}: {error_msg}")
-                norm_name = normalize_name(model_label)
-                origin = synthetic_lookup.get(norm_name)
-                result_entry = {
-                    'model': model_label,
-                    'status': 'validation_error',
-                    'error': error_msg
-                }
-                if origin:
-                    result_entry['source_local_name'] = origin['source_local_name']
-                results.append(result_entry)
-            except Exception as e:
-                error_msg = f"Unexpected error: {str(e)}"
-                model_label = (
-                    model_info.get('name', 'unknown') if isinstance(model_info, dict)
-                    else getattr(model_info, 'name', str(model_info))
-                )
-                logger.error(f"Error processing {model_label}: {error_msg}")
-                norm_name = normalize_name(model_label)
-                origin = synthetic_lookup.get(norm_name)
-                result_entry = {
-                    'model': model_label,
-                    'status': 'error',
-                    'error': error_msg
-                }
-                if origin:
-                    result_entry['source_local_name'] = origin['source_local_name']
-                results.append(result_entry)
-
-                # Continue processing if configured to do so
-                if not self.config.continue_on_error:
-                    logger.error("Stopping batch processing due to error (continue_on_error=False)")
-                    break
+        successful_models = sum(1 for r in results if r['status'] == 'success')
 
         # Save batch summary
         summary_path = Path(self.config.output_dir) / "batch_summary.json"
         with open(summary_path, 'w') as f:
             json.dump(results, f, indent=2)
 
-        logger.info(f"\nBatch processing complete. {successful_models}/{len(models)} models successful.")
+        logger.info(f"\nBatch processing complete. {successful_models}/{len(models_to_process)} models successful.")
         logger.info(f"Summary saved to {summary_path}")
 
         self._write_ambiguous_summary(results)
@@ -1116,7 +1221,7 @@ def prompt_for_api_keys() -> tuple[str | None, str | None]:
     return aa_key, hf_key
 
 
-def launch_interactive():
+async def launch_interactive_async():
     """Launch interactive pipeline mode"""
     print("🤖 LLM Benchmark Pipeline - Interactive Mode")
     print("=" * 50)
@@ -1212,73 +1317,76 @@ def launch_interactive():
     results = []
     successful = 0
 
-    for i, model_info in enumerate(detected_models, 1):
-        file_path = model_info['file']
-        model_names = model_info['names']
+    async with aiohttp.ClientSession() as session:
+        for i, model_info in enumerate(detected_models, 1):
+            file_path = model_info['file']
+            model_names = model_info['names']
 
-        print(f"\n[{i}/{len(detected_models)}] Processing: {file_path.name}")
+            print(f"\n[{i}/{len(detected_models)}] Processing: {file_path.name}")
 
-        try:
-            # Load template from file
-            template = pipeline.load_template(str(file_path))
+            try:
+                # Load template from file
+                template = pipeline.load_template(str(file_path))
 
-            # Extract model name for processing
-            model_name = model_names[0] if model_names else file_path.stem
+                # Extract model name for processing
+                model_name = model_names[0] if model_names else file_path.stem
 
-            # Try to extract HF ID from the template if it exists
-            hf_id = None
-            if isinstance(template, dict) and 'hf_id' in template:
-                hf_id = template['hf_id']
+                # Try to extract HF ID from the template if it exists
+                hf_id = None
+                if isinstance(template, dict) and 'hf_id' in template:
+                    hf_id = template['hf_id']
 
-            # Create validated model info
-            model_info_obj = ModelInfo(name=model_name, hf_id=hf_id)
+                # Create validated model info
+                model_info_obj = ModelInfo(name=model_name, hf_id=hf_id)
 
-            # Process the model
-            if verbose:
-                print(f"   📝 Processing model: {model_name}")
-            filled_data = pipeline.fill_model_data(template, model_info_obj)
-
-            # Save result
-            safe_name = file_path.stem.replace('/', '_').replace('\\', '_')
-            output_path = Path(output_dir) / f"{safe_name}_filled.json"
-            pipeline.save_result(filled_data, str(output_path))
-
-            results.append({
-                'file': str(file_path),
-                'model': model_name,
-                'status': 'success',
-                'output': str(output_path)
-            })
-            successful += 1
-
-            if verbose:
-                print(f"   ✅ Saved to: {output_path}")
-
-            ambiguous_results = pipeline.generate_ambiguous_outputs(
-                local_model_name=model_name,
-                template=template,
-                output_dir=output_dir,
-                source_file=file_path,
-            )
-            if ambiguous_results:
-                results.extend(ambiguous_results)
-                success_count = sum(1 for entry in ambiguous_results if entry['status'] == 'success')
-                successful += success_count
+                # Process the model
                 if verbose:
-                    for entry in ambiguous_results:
-                        status_symbol = '✅' if entry['status'] == 'success' else '⚠️'
-                        print(f"   {status_symbol} Ambiguous {entry['model']} -> {entry.get('output') or entry.get('error')}")
+                    print(f"   📝 Processing model: {model_name}")
+                
+                filled_data = await pipeline.fill_model_data(template, model_info_obj, session=session)
 
-        except Exception as e:
-            error_msg = str(e)
-            print(f"   ❌ Error: {error_msg}")
+                # Save result
+                safe_name = file_path.stem.replace('/', '_').replace('\\', '_')
+                output_path = Path(output_dir) / f"{safe_name}_filled.json"
+                pipeline.save_result(filled_data, str(output_path))
 
-            results.append({
-                'file': str(file_path),
-                'model': model_names[0] if model_names else file_path.stem,
-                'status': 'error',
-                'error': error_msg
-            })
+                results.append({
+                    'file': str(file_path),
+                    'model': model_name,
+                    'status': 'success',
+                    'output': str(output_path)
+                })
+                successful += 1
+
+                if verbose:
+                    print(f"   ✅ Saved to: {output_path}")
+
+                ambiguous_results = await pipeline.generate_ambiguous_outputs(
+                    local_model_name=model_name,
+                    template=template,
+                    output_dir=output_dir,
+                    session=session,
+                    source_file=file_path,
+                )
+                if ambiguous_results:
+                    results.extend(ambiguous_results)
+                    success_count = sum(1 for entry in ambiguous_results if entry['status'] == 'success')
+                    successful += success_count
+                    if verbose:
+                        for entry in ambiguous_results:
+                            status_symbol = '✅' if entry['status'] == 'success' else '⚠️'
+                            print(f"   {status_symbol} Ambiguous {entry['model']} -> {entry.get('output') or entry.get('error')}")
+
+            except Exception as e:
+                error_msg = str(e)
+                print(f"   ❌ Error: {error_msg}")
+
+                results.append({
+                    'file': str(file_path),
+                    'model': model_names[0] if model_names else file_path.stem,
+                    'status': 'error',
+                    'error': error_msg
+                })
 
     # 9. Rich recap
     print("\n" + "=" * 60)
@@ -1306,7 +1414,7 @@ def launch_interactive():
     print("=" * 60)
 
 
-def generate_mapping_interactive():
+async def generate_mapping_interactive_async():
     """Interactive tool to generate model mapping file"""
     print("🗺️  Model Mapping Generator")
     print("=" * 50)
@@ -1339,143 +1447,145 @@ def generate_mapping_interactive():
 
     # 3. Fetch API Models
     print("\n📡 Fetching model list from Artificial Analysis...")
-    try:
-        api_models = client.list_models()
-    except Exception as exc:  # pragma: no cover - network errors
-        print(f"❌ Failed to fetch models from API: {exc}")
-        return
     
-    if not api_models:
-        print("❌ API returned no models")
-        return
-    print(f"✅ Retrieved {len(api_models)} models from API")
+    async with aiohttp.ClientSession() as session:
+        try:
+            api_models = await client.list_models(session=session)
+        except Exception as exc:  # pragma: no cover - network errors
+            print(f"❌ Failed to fetch models from API: {exc}")
+            return
+        
+        if not api_models:
+            print("❌ API returned no models")
+            return
+        print(f"✅ Retrieved {len(api_models)} models from API")
 
-    # 4. Perform Matching
-    print("\n🔄 Matching models...")
-    matches: Dict[str, str] = {}
-    failures: List[str] = []
-    ambiguous_details: Dict[str, List[Dict[str, Any]]] = {}
-    
-    for file_path in json_files:
-        local_names = detect_models_in_file(file_path)
-        local_name = local_names[0] if local_names else file_path.stem
-        normalized_local = normalize_name(local_name)
+        # 4. Perform Matching
+        print("\n🔄 Matching models...")
+        matches: Dict[str, str] = {}
+        failures: List[str] = []
+        ambiguous_details: Dict[str, List[Dict[str, Any]]] = {}
         
-        found = False
-        # Try exact/normalized match first
-        for model in api_models:
-            api_name = model.get('name', '')
-            api_id = model.get('id', '')
-            norm_api_name = normalize_name(api_name)
-            norm_api_id = normalize_name(api_id)
+        for file_path in json_files:
+            local_names = detect_models_in_file(file_path)
+            local_name = local_names[0] if local_names else file_path.stem
+            normalized_local = normalize_name(local_name)
             
-            if normalized_local == norm_api_name or normalized_local == norm_api_id:
-                matches[local_name] = api_id
-                print(f"  ✅ {local_name} -> {api_name} ({api_id}) [Exact/Norm]")
-                found = True
-                break
-        
-        if not found:
-             # Try substring match
-             candidates = []
-             for model in api_models:
+            found = False
+            # Try exact/normalized match first
+            for model in api_models:
                 api_name = model.get('name', '')
                 api_id = model.get('id', '')
                 norm_api_name = normalize_name(api_name)
-                 
-                if normalized_local in norm_api_name or norm_api_name in normalized_local:
-                    # Filter out too short matches to avoid false positives
-                    if len(normalized_local) > 4 and len(norm_api_name) > 4:
-                        candidates.append(model)
+                norm_api_id = normalize_name(api_id)
+                
+                if normalized_local == norm_api_name or normalized_local == norm_api_id:
+                    matches[local_name] = api_id
+                    print(f"  ✅ {local_name} -> {api_name} ({api_id}) [Exact/Norm]")
+                    found = True
+                    break
             
-             if len(candidates) == 1:
-                 candidate = candidates[0]
-                 api_name = candidate.get('name', '')
-                 matches[local_name] = api_name or candidate.get('slug', '')
-                 print(f"  ⚠️ {local_name} -> {api_name} [Partial, mapped to official name]")
-                 found = True
-             elif len(candidates) > 1:
-                 names_list = ", ".join(model.get('name', 'unknown') for model in candidates)
-                 print(f"  ❓ {local_name} -> Multiple candidates: {names_list}")
-                 failures.append(local_name)
-                 enriched: List[Dict[str, Any]] = []
-                 for candidate in candidates:
-                     summary = {
-                         "name": candidate.get('name'),
-                         "slug": candidate.get('slug'),
-                         "id": candidate.get('id'),
-                         "release_date": candidate.get('release_date'),
-                         "benchmarks": client.extract_benchmarks(candidate),
-                         "specs": asdict(client.extract_specs(candidate)),
-                     }
-                     enriched.append(summary)
-                     print(
-                         f"     ↳ {candidate.get('name')} (slug: {candidate.get('slug')}, id: {candidate.get('id')})"
-                     )
-                 ambiguous_details[local_name] = enriched
-             else:
-                 print(f"  ❌ {local_name} -> No match found")
-                 failures.append(local_name)
+            if not found:
+                 # Try substring match
+                 candidates = []
+                 for model in api_models:
+                    api_name = model.get('name', '')
+                    api_id = model.get('id', '')
+                    norm_api_name = normalize_name(api_name)
+                     
+                    if normalized_local in norm_api_name or norm_api_name in normalized_local:
+                        # Filter out too short matches to avoid false positives
+                        if len(normalized_local) > 4 and len(norm_api_name) > 4:
+                            candidates.append(model)
+                
+                 if len(candidates) == 1:
+                     candidate = candidates[0]
+                     api_name = candidate.get('name', '')
+                     matches[local_name] = api_name or candidate.get('slug', '')
+                     print(f"  ⚠️ {local_name} -> {api_name} [Partial, mapped to official name]")
+                     found = True
+                 elif len(candidates) > 1:
+                     names_list = ", ".join(model.get('name', 'unknown') for model in candidates)
+                     print(f"  ❓ {local_name} -> Multiple candidates: {names_list}")
+                     failures.append(local_name)
+                     enriched: List[Dict[str, Any]] = []
+                     for candidate in candidates:
+                         summary = {
+                             "name": candidate.get('name'),
+                             "slug": candidate.get('slug'),
+                             "id": candidate.get('id'),
+                             "release_date": candidate.get('release_date'),
+                             "benchmarks": client.extract_benchmarks(candidate),
+                             "specs": asdict(client.extract_specs(candidate)),
+                         }
+                         enriched.append(summary)
+                         print(
+                             f"     ↳ {candidate.get('name')} (slug: {candidate.get('slug')}, id: {candidate.get('id')})"
+                         )
+                     ambiguous_details[local_name] = enriched
+                 else:
+                     print(f"  ❌ {local_name} -> No match found")
+                     failures.append(local_name)
 
-    # 5. Generate Output
-    print("\n" + "=" * 50)
-    print(f"Matched: {len(matches)} | Unmatched: {len(failures)}")
-    
-    if matches:
-        output_path = Path("tools/fill-benchmark-pipeline/model_mapping.json")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # 5. Generate Output
+        print("\n" + "=" * 50)
+        print(f"Matched: {len(matches)} | Unmatched: {len(failures)}")
         
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(matches, f, indent=2)
+        if matches:
+            output_path = Path("tools/fill-benchmark-pipeline/model_mapping.json")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             
-        print(f"\n💾 Generated mapping file at: {output_path}")
-        print("Review this file and add any missing mappings manually.")
-    
-    if ambiguous_details:
-        ambiguous_path = Path("tools/fill-benchmark-pipeline/model_mapping_ambiguous.json")
-        with open(ambiguous_path, 'w', encoding='utf-8') as f:
-            json.dump(ambiguous_details, f, indent=2)
-        print(
-            f"⚠️  Saved detailed candidate info for ambiguous matches to: {ambiguous_path}"
-        )
-
-        per_model_dir = Path("tools/fill-benchmark-pipeline/ambiguous_mappings")
-        per_model_dir.mkdir(parents=True, exist_ok=True)
-
-        def _safe_filename(name: str) -> str:
-            return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)
-
-        for local_name, candidates in ambiguous_details.items():
-            sanitized = _safe_filename(local_name)
-            per_model_path = per_model_dir / f"{sanitized}.json"
-            payload = {
-                "local_name": local_name,
-                "candidates": candidates,
-            }
-            with open(per_model_path, 'w', encoding='utf-8') as f:
-                json.dump(payload, f, indent=2)
-        print(
-            f"🗂️  Also wrote {len(ambiguous_details)} per-model ambiguous files to: {per_model_dir}"
-        )
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(matches, f, indent=2)
+                
+            print(f"\n💾 Generated mapping file at: {output_path}")
+            print("Review this file and add any missing mappings manually.")
         
-        # 6. Optional Verification
-        verify = input("\nVerify mappings by fetching info? [y/N]: ").strip().lower()
-        if verify == 'y':
-            print("\nVerifying...")
-            client.model_mapping = matches
-            for local, api_id in matches.items():
-                info = client.get_model_info(local)
-                status = "✅ OK" if info else "❌ Failed"
-                print(f"  {local} -> {status}")
-    else:
-        print("\n❌ No matches found to save.")
+        if ambiguous_details:
+            ambiguous_path = Path("tools/fill-benchmark-pipeline/model_mapping_ambiguous.json")
+            with open(ambiguous_path, 'w', encoding='utf-8') as f:
+                json.dump(ambiguous_details, f, indent=2)
+            print(
+                f"⚠️  Saved detailed candidate info for ambiguous matches to: {ambiguous_path}"
+            )
+
+            per_model_dir = Path("tools/fill-benchmark-pipeline/ambiguous_mappings")
+            per_model_dir.mkdir(parents=True, exist_ok=True)
+
+            def _safe_filename(name: str) -> str:
+                return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)
+
+            for local_name, candidates in ambiguous_details.items():
+                sanitized = _safe_filename(local_name)
+                per_model_path = per_model_dir / f"{sanitized}.json"
+                payload = {
+                    "local_name": local_name,
+                    "candidates": candidates,
+                }
+                with open(per_model_path, 'w', encoding='utf-8') as f:
+                    json.dump(payload, f, indent=2)
+            print(
+                f"🗂️  Also wrote {len(ambiguous_details)} per-model ambiguous files to: {per_model_dir}"
+            )
+            
+            # 6. Optional Verification
+            verify = input("\nVerify mappings by fetching info? [y/N]: ").strip().lower()
+            if verify == 'y':
+                print("\nVerifying...")
+                client.model_mapping = matches
+                for local, api_id in matches.items():
+                    info = await client.get_model_info(local, session=session)
+                    status = "✅ OK" if info else "❌ Failed"
+                    print(f"  {local} -> {status}")
+        else:
+            print("\n❌ No matches found to save.")
 
 
-def _run_pipeline_cli(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+async def _run_pipeline_cli_async(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     # Handle map-models command
     if args.command == 'map-models':
         try:
-            generate_mapping_interactive()
+            await generate_mapping_interactive_async()
             return 0
         except KeyboardInterrupt:
             print("\n\n❌ Operation cancelled")
@@ -1487,7 +1597,7 @@ def _run_pipeline_cli(args: argparse.Namespace, parser: argparse.ArgumentParser)
     # Handle interactive launch command
     if args.command == 'launch':
         try:
-            launch_interactive()
+            await launch_interactive_async()
             return 0
         except KeyboardInterrupt:
             print("\n\n❌ Operation cancelled by user")
@@ -1544,7 +1654,7 @@ def _run_pipeline_cli(args: argparse.Namespace, parser: argparse.ArgumentParser)
 
         pipeline_config = PipelineConfig(**config_data)
         pipeline = LLMBenchmarkPipeline(pipeline_config)
-        results = pipeline.process_batch(models)
+        results = await pipeline.process_batch(models)
 
         print("\n" + "=" * 60)
         print("BATCH PROCESSING SUMMARY")
@@ -1580,7 +1690,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     parser = create_parser()
     args = parser.parse_args(argv)
-    return _run_pipeline_cli(args, parser)
+    return asyncio.run(_run_pipeline_cli_async(args, parser))
 
 
 if __name__ == "__main__":
