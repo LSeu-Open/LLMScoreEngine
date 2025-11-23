@@ -34,4 +34,4 @@ pytest-xdist>=3.0.0
 freezegun>=1.0.0
 respx>=0.20.0
 ruff>=0.1.0
-axe-core-python>=0.3.0
+axe-core-python
