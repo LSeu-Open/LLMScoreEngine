@@ -28,20 +28,16 @@
   - [Models Data Format](#models-data-format)
     - [Where to find the data ?](#where-to-find-the-data-)
 - [Usage](#usage)
-  - [Visualize All Your Models Scores in One Powerful Report](#visualize-all-your-models-scores-in-one-powerful-report)
-  - [Command-Line Usage](#command-line-usage)
-  - [Command-Line Options](#command-line-options)
-  - [IDE Usage](#ide-usage)
-- [Results Data Format](#results-data-format)
-- [Additional Tools](#additional-tools)
-  - [Fill Benchmark Pipeline](#fill-benchmark-pipeline)
-  - [Interactive Assistant Shell](#interactive-assistant-shell)
+  - [Command-Line Usage (Recommended)](#command-line-usage-recommended)
+    - [Fill Benchmark Pipeline (New)](#fill-benchmark-pipeline-new)
+    - [Visualize All Your Models Scores in One Powerful Report](#visualize-all-your-models-scores-in-one-powerful-report)
+    - [Command-Line Options](#command-line-options)
+  - [Programmatic Usage](#programmatic-usage)
+  - [Interactive Assistant Shell (In Development)](#interactive-assistant-shell-in-development)
     - [Key UX Enhancements](#key-ux-enhancements)
     - [Accessibility \& Inclusivity](#accessibility--inclusivity)
-    - [Performance Monitoring](#performance-monitoring)
-    - [Configuration \& Flags](#configuration--flags)
     - [Keyboard Shortcuts](#keyboard-shortcuts)
-    - [Documentation](#documentation)
+- [Results Data Format](#results-data-format)
 - [Testing Strategy \& Quality Assurance](#testing-strategy--quality-assurance)
   - [Test Layers](#test-layers)
   - [CI Pipeline](#ci-pipeline)
@@ -67,11 +63,13 @@ To help us refine and improve LLMScoreEngine during this beta phase, we actively
 
 ## New features in Beta v0.7
 
+- **Automated Benchmark Pipeline**: A powerful new tool (`fill-benchmark-pipeline`) to automatically populate model benchmarks from external APIs.
+- **Improved Reporting**: Updated HTML graph generation with enhanced visualization capabilities, better data handling, and improved interactivity.
 - **Scoring Engine Update**: Enhanced technical score calculation to include model input/output pricing.
-- **Rich Reporting**: New `--graph` CLI option to generate interactive HTML visualization reports from CSV results.
-- **Interactive Shell Overhaul**: A completely redesigned `llmscore shell` featuring a multi-pane layout, smart dock, command palette, and robust accessibility tools.
+- **Added command-line option** : Enhanced flexibility with new CLI argument for custom configurations, allowing more granular control.
 - **Quality Assurance**: Introduced a comprehensive testing strategy and CI pipeline to enforce performance budgets and prevent regressions.
 - **Optimized Architecture**: Streamlined dependencies and updated documentation for a better developer experience.
+- **Interactive Shell Overhaul (Preview)**: A completely redesigned `llmscore shell` is in active development, featuring a multi-pane layout and smart dock.
 
 ## Project Structure
 
@@ -308,39 +306,7 @@ python model_scoring/scoring/hf_score.py deepseek-ai/DeepSeek-R1
 
 ## Usage
 
-### Visualize All Your Models Scores in One Powerful Report
-
-Discover everything you need to evaluate performance and efficiency at a glance:
-
-- **Interactive Leaderboard**: Rank all your models with smart filters for quick comparisons.
-- **Insightful Visualizations**: Explore key metrics including:
-  - Performance vs. Parameter Count  
-  - Score Composition  
-  - Cost Analysis  
-  - Architecture Distribution
-- **Cost-Efficiency Leaderboard**: Identify the best-performing models relative to their cost.
-- **Model Comparison Tool**: Easily compare multiple models side by side.
-
-All insights in one unified, actionable report — no more scattered data.
-
-<img src="https://github.com/LSeu-Open/LLMScoreEngine/blob/main/Graph_Report.png" height="800">
-
-Create this comprehensive report from your models in just two commands:
-
-1. Run a silent, CSV-exported model evaluation :
-
-```bash
-python score_models.py --all --quiet --csv
-```
-
-2. Generate visualizations and the final report :
-
-```bash
-python score_models.py --graph
-```
-<br>
-
-### Command-Line Usage
+### Command-Line Usage (Recommended)
 
 You can run the scoring script from your terminal.
 
@@ -366,9 +332,64 @@ To read models from a different folder, pass `--models-dir` alongside `--all` (o
 python score_models.py --all --models-dir CustomModels/
 ```
 
-See the following section for more options to customize the behavior.
+#### 🚀 Fill Benchmark Pipeline (New)
 
-### Command-Line Options
+The `tools/fill-benchmark-pipeline/` directory contains a powerful new automated pipeline for filling model benchmark JSON files with data from multiple API sources. This is the recommended tool for preparing model data.
+
+**Features:**
+- 🚀 **Interactive CLI** with guided prompts and automatic model detection
+- 🔧 **Multi-API Integration** (Artificial Analysis, Hugging Face)
+- ✅ **Input Validation** using Pydantic models
+- ⚡ **Rate Limiting & Retry Logic** with exponential backoff
+- 📊 **Rich Progress Reporting** and coverage statistics
+
+**Installation:**
+```bash
+pip install -e .[fill-benchmark-pipeline]
+```
+
+**Usage:**
+```bash
+# Interactive mode (recommended)
+python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py launch
+
+# Process with config file
+python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py --config config.yaml
+```
+
+For detailed usage instructions, see the [pipeline README](docs/FILL_BENCH_README.md).
+
+#### Visualize All Your Models Scores in One Powerful Report
+
+Discover everything you need to evaluate performance and efficiency at a glance:
+
+- **Interactive Leaderboard**: Rank all your models with smart filters for quick comparisons.
+- **Insightful Visualizations**: Explore key metrics including:
+  - Performance vs. Parameter Count  
+  - Score Composition  
+  - Cost Analysis  
+  - Architecture Distribution
+- **Cost-Efficiency Leaderboard**: Identify the best-performing models relative to their cost.
+- **Model Comparison Tool**: Easily compare multiple models side by side.
+
+All insights in one unified, actionable report — no more scattered data.
+
+Create this comprehensive report from your models in just two commands:
+
+1. Run a silent, CSV-exported model evaluation :
+
+```bash
+python score_models.py --all --quiet --csv
+```
+
+2. Generate visualizations and the final report :
+
+```bash
+python score_models.py --graph
+```
+<br>
+
+#### Command-Line Options
 
 You can customize the scoring process with the following optional flags:
 
@@ -381,9 +402,44 @@ You can customize the scoring process with the following optional flags:
 | `--csv`              | Generate a CSV report from existing results.                                                            | `python score_models.py --csv`                      |
 | `--graph`            | Generate a graph report from existing csv report.                                                          | `python score_models.py --graph`                    |
 
-### IDE Usage
+### Programmatic Usage
 
-If you prefer to run the script from your IDE without command-line arguments, you can modify `score_models.py` directly. However, using the command-line interface is the recommended approach for flexibility.
+You can also call the scoring functions directly from your Python code. Import the necessary functions from `model_scoring.scoring.score_models` and use them programmatically.
+
+### Interactive Assistant Shell (In Development)
+
+> **⚠️ Note:** The Interactive Shell is currently in **active development** and is considered an experimental feature. APIs and UI elements may change frequently.
+
+The **LLMScore Shell** (`llmscore shell`) has undergone a comprehensive UI/UX overhaul to support daily evaluation workflows with a modern, multi-pane console experience. This unified interface brings together execution, monitoring, and context management into a single ergonomic workspace.
+
+#### Key UX Enhancements
+
+- **Multi-Pane Workspace**: A responsive 3-column layout featuring:
+  - **Command Stream**: The central hub for execution and logs.
+  - **Timeline Pane**: A chronological feed of events, actions, and system state.
+  - **Context Pane**: Persistent view of active configurations, pinned metrics, and scratchpad notes.
+- **Smart Dock**: A fixed, always-visible input area that anchors the bottom of the screen, hosting the prompt, autocomplete suggestions, and quick-action status chips.
+- **Command Palette 2.0**: A keyboard-centric (`Ctrl+K`) palette for quick navigation, command execution, and workspace management, featuring fuzzy search and grouped actions.
+- **Structured Output Cards**: Rich, interactive result cards that replace raw text logs, offering organized summaries, copy-to-clipboard buttons, and export options.
+
+#### Accessibility & Inclusivity
+
+We are committed to a shell that works for everyone. Beta v0.7 introduces:
+- **Deterministic Focus Order**: Cycle seamlessly between panes (Timeline → Context → Command → Dock) using `Ctrl+P` with screen-reader announcements.
+- **Reduced Motion Mode**: A dedicated configuration flag to disable spinners and sliding animations for a static, distraction-free experience.
+- **Color-Blind Support**: High-contrast palette tokens ensuring readability and distinction for status indicators and charts 
+
+#### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+K` | Open Command Palette |
+| `Ctrl+P` | Cycle Pane Focus (Timeline → Context → Stream → Dock) |
+| `Ctrl+T` | Toggle Timeline Pane |
+| `Ctrl+C` | Toggle Context Pane |
+| `Ctrl+Shift+L` | Clear Screen |
+
+For a complete guide on commands, layout configuration, and troubleshooting, see the [Shell Documentation](docs/SHELL_README.md).
 
 ## Results Data Format
 
@@ -439,89 +495,6 @@ Results will be stored as JSON files in the `Results` directory, with the follow
     }
 }
 ```
-## Additional Tools
-
-### Fill Benchmark Pipeline
-
-The `tools/fill-benchmark-pipeline/` directory contains an automated pipeline for filling model benchmark JSON files with data from multiple API sources. This tool helps prepare the model data files that are consumed by the main LLMScoreEngine.
-
-**Features:**
-- 🚀 **Interactive CLI** with guided prompts and automatic model detection
-- 🔧 **Multi-API Integration** (Artificial Analysis, Hugging Face)
-- ✅ **Input Validation** using Pydantic models
-- ⚡ **Rate Limiting & Retry Logic** with exponential backoff
-- 📊 **Rich Progress Reporting** and coverage statistics
-
-**Installation:**
-```bash
-pip install -e .[fill-benchmark-pipeline]
-```
-
-**Usage:**
-```bash
-# Interactive mode (recommended)
-python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py launch
-
-# Process with config file
-python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py --config config.yaml
-```
-
-For detailed usage instructions, see the [pipeline README](docs/FILL_BENCH_README.md).
-
-### Interactive Assistant Shell
-
-The **LLMScore Shell** (`llmscore shell`) has undergone a comprehensive UI/UX overhaul to support daily evaluation workflows with a modern, multi-pane console experience. This unified interface brings together execution, monitoring, and context management into a single ergonomic workspace.
-
-#### Key UX Enhancements
-
-- **Multi-Pane Workspace**: A responsive 3-column layout featuring:
-  - **Command Stream**: The central hub for execution and logs.
-  - **Timeline Pane**: A chronological feed of events, actions, and system state.
-  - **Context Pane**: Persistent view of active configurations, pinned metrics, and scratchpad notes.
-- **Smart Dock**: A fixed, always-visible input area that anchors the bottom of the screen, hosting the prompt, autocomplete suggestions, and quick-action status chips.
-- **Command Palette 2.0**: A keyboard-centric (`Ctrl+K`) palette for quick navigation, command execution, and workspace management, featuring fuzzy search and grouped actions.
-- **Structured Output Cards**: Rich, interactive result cards that replace raw text logs, offering organized summaries, copy-to-clipboard buttons, and export options.
-
-#### Accessibility & Inclusivity
-
-We are committed to a shell that works for everyone. Beta v0.7 introduces:
-- **Deterministic Focus Order**: Cycle seamlessly between panes (Timeline → Context → Command → Dock) using `Ctrl+P` with screen-reader announcements.
-- **Reduced Motion Mode**: A dedicated configuration flag to disable spinners and sliding animations for a static, distraction-free experience.
-- **Color-Blind Support**: High-contrast palette tokens ensuring readability and distinction for status indicators and charts.
-
-#### Performance Monitoring
-
-To ensure the shell remains responsive, we've integrated a **Performance Monitor** that tracks render loops and command latency against defined budgets.
-- **Budgets**: Enforced limits for key interactions (e.g., 150ms command loop).
-- **Reporting**: The `performance` command provides real-time samples and violation summaries.
-- **CI Integration**: Performance checks run automatically to prevent regression.
-
-#### Configuration & Flags
-
-Enable the new experience in your configuration (or pass via `ShellConfig`):
-
-```toml
-[shell]
-enable_layout_v2 = true          # Enable the multi-pane layout
-use_output_cards = true          # Use structured rich-text cards
-palette_autocomplete = true      # Enable inline palette suggestions
-reduced_motion = false           # Disable animations
-color_blind_mode = false         # Use high-contrast theme
-performance_monitor_enabled = true # Track render performance
-```
-#### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+K` | Open Command Palette |
-| `Ctrl+P` | Cycle Pane Focus (Timeline → Context → Stream → Dock) |
-| `Ctrl+T` | Toggle Timeline Pane |
-| `Ctrl+C` | Toggle Context Pane |
-| `Ctrl+Shift+L` | Clear Screen |
-
-#### Documentation
-
-For a complete guide on commands, layout configuration, and troubleshooting, see the [Shell Documentation](docs/SHELL_README.md).
 
 ## Testing Strategy & Quality Assurance
 
