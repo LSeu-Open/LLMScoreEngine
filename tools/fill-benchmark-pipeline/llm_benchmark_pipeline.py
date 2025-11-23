@@ -1,4 +1,42 @@
 #!/usr/bin/env python3
+
+# ------------------------------------------------------------------------------------------------
+# License
+# ------------------------------------------------------------------------------------------------
+
+# Copyright (c) 2025 LSeu-Open
+#
+# This code is licensed under the MIT License.
+# See LICENSE file in the root directory
+
+# ------------------------------------------------------------------------------------------------
+# Description
+# ------------------------------------------------------------------------------------------------
+
+# This script is the main entry point for running the model scoring system.
+# It provides backward compatibility with the previous version.
+
+# This is the Beta v0.7 of the scoring system
+
+# ------------------------------------------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------------------------------------------
+
+import json
+import os
+import time
+import argparse
+import re
+import copy
+from typing import Dict, Any, Optional, List, Union, Sequence, Tuple
+from pathlib import Path
+import requests
+from dataclasses import dataclass, asdict
+import logging
+from pydantic import BaseModel, ValidationError, field_validator, Field
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import functools
+
 """
 LLM Benchmark Data Pipeline
 =============================
@@ -17,20 +55,7 @@ Environment variables (.env file):
     HUGGINGFACE_API_KEY=your_key_here  # optional, for rate limits
 """
 
-import json
-import os
-import time
-import argparse
-import re
-import copy
-from typing import Dict, Any, Optional, List, Union, Sequence, Tuple
-from pathlib import Path
-import requests
-from dataclasses import dataclass, asdict
-import logging
-from pydantic import BaseModel, ValidationError, field_validator, Field
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-import functools
+
 
 # Configure logging
 logging.basicConfig(
@@ -1108,8 +1133,8 @@ def launch_interactive():
     # 2. Prompt for input folder
     print("\n📁 Input Folder")
     while True:
-        input_folder = input("Input folder containing model JSONs (default: ./): ").strip()
-        input_folder = input_folder if input_folder else "."
+        input_folder = input("Input folder containing model JSONs (press Enter for default: ./Models): ").strip()
+        input_folder = input_folder if input_folder else "./Models"
 
         try:
             json_files = scan_json_folder(input_folder)
@@ -1158,7 +1183,7 @@ def launch_interactive():
 
     # 5. Prompt for output folder
     print("\n📂 Output Folder")
-    output_dir = input("Output folder for results (default: ./filled_models): ").strip()
+    output_dir = input("Output folder for results (press Enter for default: ./filled_models): ").strip()
     output_dir = output_dir if output_dir else "./filled_models"
 
     # 6. Ask for verbose mode
