@@ -14,7 +14,7 @@
 # This script is the main entry point for running the model scoring system.
 # It provides backward compatibility with the previous version.
 
-# This is the Beta v0.5 of the scoring system
+# This is the Beta v0.7 of the scoring system
 
 # ------------------------------------------------------------------------------------------------
 # Imports
@@ -120,8 +120,26 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
         configure_console_only_logging(quiet=args.quiet)
 
+        # Ensure Results directory exists
+        results_dir = "Results"
+        if not os.path.isdir(results_dir):
+            os.makedirs(results_dir, exist_ok=True)
+            if not args.quiet:
+                print(f"[*] Created results directory: {results_dir}")
+
         if args.all:
             models_dir = args.models_dir
+            
+            # Auto-create default Models directory if it doesn't exist
+            if models_dir == "Models" and not os.path.isdir(models_dir):
+                try:
+                    os.makedirs(models_dir)
+                    if not args.quiet:
+                        print(f"[*] Created default models directory: {models_dir}")
+                except OSError as e:
+                    print(f"[-] Failed to create models directory: {e}")
+                    return
+
             if not os.path.isdir(models_dir):
                 print(
                     f"[-] Models directory not found: {models_dir}. "
