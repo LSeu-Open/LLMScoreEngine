@@ -134,47 +134,61 @@ LLMScoreEngine/
 git clone https://github.com/LSeu-Open/LLMScoreEngine.git
 ```
 
-**Step 2:** Create and activate a virtual environment:
+**Step 2 (recommended):** Run the automated setup script
 
-Using uv (recommended):
+- **Unix/macOS:**
+  ```bash
+  cd LLMScoreEngine
+  chmod +x setup.sh   # first time only
+  ./setup.sh
+  ```
 
-```bash
-# Create a virtual environment
-uv venv
+- **Windows (PowerShell or Command Prompt):**
+  ```bat
+  cd LLMScoreEngine
+  setup_windows.bat
+  ```
 
-# Activate the virtual environment
-# On Windows:
-.venv\Scripts\activate
-# On Unix or MacOS:
-source .venv/bin/activate
-```
+These scripts will verify Python/uv, create `.venv`, install `requirements.txt`, and create the `Models/` and `filled_models/` folders. After they finish, activate the environment with:
 
-**Step 3:** Install the dependencies:
+- Unix/macOS: `source .venv/bin/activate`
+- Windows: `call .venv\Scripts\activate.bat`
 
-**For standard usage:**
-```bash
-uv pip install -e .
-```
+**Manual setup (alternative):**
 
-**For development (including testing):**
-```bash
-uv pip install -e ".[dev]"
-```
+1. Create and activate a virtual environment using uv:
+   ```bash
+   uv venv
+   # On Windows:
+   .venv\Scripts\activate
+   # On Unix or macOS:
+   source .venv/bin/activate
+   ```
 
-Or using pip:
-
-```bash
-pip install -r requirements.txt
-pip install -e ".[dev]"
-```
+2. Install dependencies:
+   - Standard usage:
+     ```bash
+     uv pip install -e .
+     ```
+   - Development/testing:
+     ```bash
+     uv pip install -e ".[dev]"
+     ```
+   - Or with pip:
+     ```bash
+     pip install -r requirements.txt
+     pip install -e ".[dev]"
+     ```
 
 ## Model Data Setup
 
-**Step 1:** Create the `Models` directory:
+**Step 1:** Ensure the `Models` directory exists.
 
-```bash
-mkdir Models
-```
+- If you used `setup.sh` or `setup_windows.bat`, this directory is already created for you (along with `filled_models`).
+- Otherwise, create it manually:
+  ```bash
+  mkdir Models
+  ```
 
 **Step 2:** Add Model Data:
 
