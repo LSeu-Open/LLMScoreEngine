@@ -65,6 +65,7 @@ models_mapping.json
 site/
 
 # Generated Files
+.cache/
 .benchmarks/
 .mypy_cache/
 artifacts/
