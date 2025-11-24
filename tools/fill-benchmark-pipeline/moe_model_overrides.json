@@ -1,0 +1,18 @@
+{
+    "moe_patterns": [
+        "^deepseek[-\\s]?r1",
+        "^deepseek[-\\s]?r1.*update",
+        "^minimax[-\\s]?m1",
+        "^minimax[-\\s]?m2",
+        "^gpt[-\\s]?oss[-\\s]?120b",
+        "^gpt[-\\s]?oss[-\\s]?20b",
+        "^glm[-\\s]?4\\.5$",
+        "^glm[-\\s]?4\\.5[-\\s]?air$",
+        "^glm[-\\s]?4\\.6$",
+        "^llama[-\\s]?4[-\\s]?maverick",
+        "^llama[-\\s]?4[-\\s]?scout"
+    ],
+    "moe_exclude_patterns": [
+        "distill"
+    ]
+}
