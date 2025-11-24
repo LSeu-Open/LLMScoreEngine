@@ -35,6 +35,7 @@ Environment variables (.env file):
 # Imports
 # ------------------------------------------------------------------------------------------------
 
+import csv
 import json
 import os
 import time
@@ -42,7 +43,7 @@ import argparse
 import re
 import copy
 import asyncio
-from typing import Dict, Any, Optional, List, Union, Sequence, Tuple
+from typing import Dict, Any, Optional, List, Union, Sequence, Tuple, Pattern
 from pathlib import Path
 import aiohttp
 import requests
@@ -59,6 +60,38 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _load_moe_override_patterns() -> Tuple[List[Pattern[str]], List[Pattern[str]]]:
+    script_dir = Path(__file__).parent
+    overrides_path = script_dir / "moe_model_overrides.json"
+    if not overrides_path.exists():
+        return [], []
+
+    try:
+        with open(overrides_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.warning("Failed to load MoE overrides from %s: %s", overrides_path, exc)
+        return [], []
+
+    def _compile(patterns: List[str]) -> List[Pattern[str]]:
+        compiled: List[Pattern[str]] = []
+        for pattern in patterns:
+            try:
+                compiled.append(re.compile(pattern, re.IGNORECASE))
+            except re.error as regex_exc:
+                logger.warning(
+                    "Invalid MoE override regex '%s' in %s: %s",
+                    pattern,
+                    overrides_path,
+                    regex_exc,
+                )
+        return compiled
+
+    include = _compile(data.get('moe_patterns', []))
+    exclude = _compile(data.get('moe_exclude_patterns', []))
+    return include, exclude
 
 
 # Pydantic Models for Validation
@@ -127,6 +160,13 @@ class PipelineConfig(BaseModel):
         if 'template_path' in cls.model_fields and not path.exists():
             raise ValueError(f'Path does not exist: {v}')
         return str(path)
+
+
+MOE_NAME_REGEXES = [
+    re.compile(r"\b\d+\s*b\s*-\s*\d+\s*x\s*\d+\s*b\b", re.IGNORECASE),
+    re.compile(r"\b\d+(?:\.\d+)?\s*b[\s-]+[a-z]+\d+(?:x\d+)?\s*b\b", re.IGNORECASE),
+    re.compile(r"\b\d+\s*x\s*\d+\s*b\b", re.IGNORECASE),
+]
 
 
 @dataclass
@@ -456,9 +496,11 @@ class ArtificialAnalysisClient(APIClient):
             'humaneval': 'HumanEval',
             'mbpp': 'MBPP',
             'aime': 'AIME',
+            'aime_25': 'AIME',
             'livecodebench': 'LiveCodeBench',
             'livebench': 'LiveCodeBench',
             'scicode': 'SciCode',
+            'hle': "Humanity's Last Exam",
             'artificial_analysis_intelligence_index': 'artificial_analysis',
             'intelligence_index': 'artificial_analysis'
         }
@@ -484,6 +526,301 @@ class ArtificialAnalysisClient(APIClient):
             param_count=model_data.get('parameters'),
             architecture=creator.get('name') or model_data.get('slug'),
         )
+
+
+class BaseLeaderboardClient:
+    """Shared helpers for leaderboard clients using cached JSON payloads."""
+
+    def __init__(self, cache_file: Path, cache_ttl: int = 3600):
+        self.cache_file = cache_file
+        self.cache_ttl = cache_ttl
+        self._cache_timestamp: float = 0.0
+        self._entries: Optional[List[Dict[str, Any]]] = None
+
+    def _load_cache(self) -> None:
+        if not self.cache_file.exists():
+            return
+        try:
+            with open(self.cache_file, "r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+            timestamp = payload.get("timestamp", 0)
+            if time.time() - timestamp > self.cache_ttl:
+                return
+            entries = payload.get("entries")
+            if isinstance(entries, list):
+                self._entries = entries
+                self._cache_timestamp = timestamp
+                logger.info("Loaded cache %s (%d entries)", self.cache_file.name, len(entries))
+        except Exception as exc:
+            logger.warning("Failed to load cache %s: %s", self.cache_file, exc)
+
+    def _save_cache(self) -> None:
+        if not self._entries:
+            return
+        try:
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.cache_file, "w", encoding="utf-8") as fh:
+                json.dump({"timestamp": self._cache_timestamp, "entries": self._entries}, fh)
+        except Exception as exc:
+            logger.warning("Failed to save cache %s: %s", self.cache_file, exc)
+
+    def _ensure_entries_loaded(self) -> bool:
+        if self._entries and (time.time() - self._cache_timestamp) <= self.cache_ttl:
+            return True
+        if self._entries is None:
+            self._load_cache()
+            if self._entries:
+                return True
+        return False
+
+
+class UGILeaderboardClient(BaseLeaderboardClient):
+    """Fetch and cache UGI leaderboard scores from the public HF CSV."""
+
+    CSV_URL = "https://huggingface.co/spaces/DontPlanToEnd/UGI-Leaderboard/resolve/main/ugi-leaderboard-data.csv"
+    MODEL_COLUMN = "author/model_name"
+    SCORE_COLUMNS = ("UGI 🏆", "UGI", "UGI Score")
+
+    def __init__(self, cache_ttl: int = 3600, cache_dir: Optional[str] = None,
+                 aliases: Optional[Dict[str, Union[str, List[str]]]] = None):
+        cache_dir_path = Path(cache_dir) if cache_dir else Path(__file__).parent / ".cache"
+        super().__init__(cache_file=cache_dir_path / "ugi_leaderboard_cache.json", cache_ttl=cache_ttl)
+        self.cache_dir = cache_dir_path
+        self._rows: Optional[List[Dict[str, Any]]] = None
+        self.alias_map: Dict[str, List[str]] = {}
+        if aliases:
+            normalized: Dict[str, List[str]] = {}
+            for key, values in aliases.items():
+                norm_key = normalize_name(key)
+                if not norm_key:
+                    continue
+                if isinstance(values, str):
+                    values = [values]
+                elif not isinstance(values, (list, tuple, set)):
+                    continue
+                normalized[norm_key] = [normalize_name(v) for v in values if isinstance(v, str)]
+            self.alias_map = normalized
+
+    async def _fetch_rows(self, session: Optional[aiohttp.ClientSession] = None) -> None:
+        if self._rows and (time.time() - self._cache_timestamp) <= self.cache_ttl:
+            return
+
+        if self._rows is None:
+            self._ensure_entries_loaded()
+            if self._rows:
+                return
+
+        local_session = False
+        if session is None:
+            session = aiohttp.ClientSession()
+            local_session = True
+
+        try:
+            async with session.get(self.CSV_URL, timeout=60) as response:
+                if response.status != 200:
+                    logger.error("Failed to download UGI leaderboard: HTTP %s", response.status)
+                    return
+                text = await response.text()
+        except Exception as exc:
+            logger.error("Error downloading UGI leaderboard: %s", exc)
+            return
+        finally:
+            if local_session:
+                await session.close()
+
+        reader = csv.DictReader(text.splitlines())
+        if reader.fieldnames:
+            reader.fieldnames = [name.lstrip("\ufeff") if isinstance(name, str) else name for name in reader.fieldnames]
+        self._rows = [row for row in reader]
+        self._cache_timestamp = time.time()
+        self._entries = self._rows
+        self._save_cache()
+        logger.info("Fetched %d UGI leaderboard rows", len(self._rows))
+
+    async def get_score(self, model_name: str, session: Optional[aiohttp.ClientSession] = None) -> Optional[float]:
+        if not model_name:
+            return None
+
+        await self._fetch_rows(session=session)
+        if not self._rows:
+            return None
+
+        norm_target = normalize_name(model_name)
+        target_norms = {norm_target}
+        if norm_target in self.alias_map:
+            target_norms.update(self.alias_map[norm_target])
+        for row in self._rows:
+            raw_model = row.get(self.MODEL_COLUMN, "")
+            if not raw_model:
+                continue
+            candidates = [raw_model]
+            if "/" in raw_model:
+                candidates.append(raw_model.split("/")[-1])
+
+            row_norms = {normalize_name(candidate) for candidate in candidates if candidate}
+            if target_norms & row_norms:
+                score_raw = None
+                for column in self.SCORE_COLUMNS:
+                    score_raw = row.get(column)
+                    if score_raw:
+                        break
+                if not score_raw:
+                    return None
+                try:
+                    return float(score_raw)
+                except (TypeError, ValueError):
+                    logger.warning("Invalid UGI score '%s' for model %s", score_raw, raw_model)
+                    return None
+
+        logger.debug("UGI leaderboard entry not found for %s", model_name)
+        return None
+
+
+class OpenVLMLeaderboardClient(BaseLeaderboardClient):
+    """Client for Open VLM leaderboard JSON feed."""
+
+    JSON_URL = "http://opencompass.openxlab.space/assets/OpenVLM.json"
+    BENCHMARK_MAPPINGS: Dict[str, Tuple[str, str]] = {
+        'MMMU': ('MMMU_VAL', 'Overall'),
+        'Mathvista': ('MathVista', 'Overall'),
+        'AI2D': ('AI2D', 'Overall'),
+    }
+
+    def __init__(self, cache_ttl: int = 3600, cache_dir: Optional[str] = None,
+                 aliases: Optional[Dict[str, Union[str, List[str]]]] = None):
+        cache_dir_path = Path(cache_dir) if cache_dir else Path(__file__).parent / ".cache"
+        super().__init__(cache_file=cache_dir_path / "open_vlm_cache.json", cache_ttl=cache_ttl)
+        self.cache_dir = cache_dir_path
+        self._payload: Optional[Dict[str, Any]] = None
+        self.alias_map: Dict[str, List[str]] = {}
+        if aliases:
+            normalized: Dict[str, List[str]] = {}
+            for key, values in aliases.items():
+                norm_key = normalize_name(key)
+                if not norm_key:
+                    continue
+                if isinstance(values, str):
+                    values = [values]
+                elif not isinstance(values, (list, tuple, set)):
+                    continue
+                normalized[norm_key] = [normalize_name(v) for v in values if isinstance(v, str)]
+            self.alias_map = normalized
+
+    async def _fetch_payload(self, session: Optional[aiohttp.ClientSession] = None) -> None:
+        if self._payload and (time.time() - self._cache_timestamp) <= self.cache_ttl:
+            return
+
+        if self._payload is None:
+            if self._ensure_entries_loaded():
+                self._payload = {"results": {entry["model_name"]: entry for entry in self._entries}}
+                return
+
+        local_session = False
+        if session is None:
+            session = aiohttp.ClientSession()
+            local_session = True
+
+        try:
+            async with session.get(self.JSON_URL, timeout=60) as response:
+                if response.status != 200:
+                    logger.error("Failed to download Open VLM leaderboard: HTTP %s", response.status)
+                    return
+                text = await response.text()
+        except Exception as exc:
+            logger.error("Error downloading Open VLM leaderboard: %s", exc)
+            return
+        finally:
+            if local_session:
+                await session.close()
+
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid JSON from Open VLM leaderboard: %s", exc)
+            return
+
+        results = payload.get("results")
+        if not isinstance(results, dict):
+            logger.warning("Unexpected Open VLM payload shape")
+            return
+
+        self._payload = payload
+        self._entries = [
+            {"model_name": name, **data}
+            for name, data in results.items()
+        ]
+        self._cache_timestamp = time.time()
+        self._save_cache()
+        logger.info("Fetched Open VLM leaderboard payload (%d entries)", len(self._entries))
+
+    async def _find_result_entry(self, model_name: str, session: Optional[aiohttp.ClientSession] = None) -> Optional[Dict[str, Any]]:
+        if not model_name:
+            return None
+
+        await self._fetch_payload(session=session)
+        if not self._payload:
+            return None
+
+        results = self._payload.get("results", {}) or {}
+        norm_target = normalize_name(model_name)
+        target_norms = {norm_target}
+        if norm_target in self.alias_map:
+            target_norms.update(self.alias_map[norm_target])
+
+        for name, entry in results.items():
+            row_norms = {normalize_name(name)}
+            method_field = entry.get("META", {}).get("Method")
+            if isinstance(method_field, list) and method_field:
+                method_norm = normalize_name(method_field[0])
+                if method_norm:
+                    row_norms.add(method_norm)
+            elif isinstance(method_field, str):
+                method_norm = normalize_name(method_field)
+                if method_norm:
+                    row_norms.add(method_norm)
+
+            if target_norms & {norm for norm in row_norms if norm}:
+                return entry
+
+        logger.debug("Open VLM entry not found for %s", model_name)
+        return None
+
+    async def get_score(self, model_name: str, session: Optional[aiohttp.ClientSession] = None,
+                        score_key: str = "MMBench_TEST_EN", sub_key: str = "Overall") -> Optional[float]:
+        entry = await self._find_result_entry(model_name, session=session)
+        if not entry:
+            return None
+
+        section = entry.get(score_key)
+        if isinstance(section, dict):
+            score_val = section.get(sub_key)
+            if isinstance(score_val, (int, float)):
+                return float(score_val)
+        return None
+
+    async def get_benchmark_scores(
+        self,
+        model_name: str,
+        session: Optional[aiohttp.ClientSession] = None,
+        benchmark_map: Optional[Dict[str, Tuple[str, str]]] = None,
+    ) -> Dict[str, float]:
+        mapping = benchmark_map or self.BENCHMARK_MAPPINGS
+        if not mapping:
+            return {}
+
+        entry = await self._find_result_entry(model_name, session=session)
+        if not entry:
+            return {}
+
+        results: Dict[str, float] = {}
+        for output_name, (score_key, sub_key) in mapping.items():
+            section = entry.get(score_key)
+            if not isinstance(section, dict):
+                continue
+            score_val = section.get(sub_key)
+            if isinstance(score_val, (int, float)):
+                results[output_name] = float(score_val)
+        return results
 
 
 class HuggingFaceClient(APIClient):
@@ -570,6 +907,9 @@ class LLMBenchmarkPipeline:
                     logger.warning(f"Failed to load ambiguous mapping: {e}")
 
             self.synthetic_lookup: Dict[str, Dict[str, Any]] = {}
+            self.source_usage: Dict[str, Dict[str, bool]] = {}
+            self.last_run_source_stats: Dict[str, Any] = {}
+            self.moe_include_patterns, self.moe_exclude_patterns = _load_moe_override_patterns()
 
             self.aa_client = ArtificialAnalysisClient(
                 api_key=validated_config.artificial_analysis_key,
@@ -587,6 +927,41 @@ class LLMBenchmarkPipeline:
                 max_retries=validated_config.max_retries,
                 backoff_factor=validated_config.retry_backoff_factor,
                 timeout=validated_config.timeout
+            )
+            ugi_aliases: Dict[str, Union[str, List[str]]] = {}
+            ugi_mapping_path = script_dir / "ugi_model_mapping.json"
+            if ugi_mapping_path.exists():
+                try:
+                    with open(ugi_mapping_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        ugi_aliases = data
+                        logger.info(f"Loaded UGI model mapping from {ugi_mapping_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to load UGI model mapping: {e}")
+
+            self.ugi_client = UGILeaderboardClient(
+                cache_ttl=validated_config.cache_ttl,
+                cache_dir=str(script_dir / ".cache"),
+                aliases=ugi_aliases
+            )
+
+            open_vlm_aliases: Dict[str, Union[str, List[str]]] = {}
+            open_vlm_mapping_path = script_dir / "open_vlm_model_mapping.json"
+            if open_vlm_mapping_path.exists():
+                try:
+                    with open(open_vlm_mapping_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        open_vlm_aliases = data
+                        logger.info(f"Loaded Open VLM model mapping from {open_vlm_mapping_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to load Open VLM model mapping: {e}")
+
+            self.open_vlm_client = OpenVLMLeaderboardClient(
+                cache_ttl=validated_config.cache_ttl,
+                cache_dir=str(script_dir / ".cache"),
+                aliases=open_vlm_aliases
             )
 
             logger.info("Pipeline initialized successfully")
@@ -611,6 +986,30 @@ class LLMBenchmarkPipeline:
             if lowered in {"dense", "moe"}:
                 return lowered
         return "dense"
+
+    @staticmethod
+    def _infer_architecture_from_name(model_name: Optional[str], include_patterns: Optional[List[Pattern[str]]] = None,
+                                      exclude_patterns: Optional[List[Pattern[str]]] = None) -> Optional[str]:
+        if not model_name:
+            return None
+
+        lowered = model_name.strip().lower()
+
+        include_patterns = include_patterns or []
+        exclude_patterns = exclude_patterns or []
+
+        if not any(pattern.search(lowered) for pattern in exclude_patterns):
+            if any(pattern.search(lowered) for pattern in include_patterns):
+                return "moe"
+
+        if any(token in lowered for token in ["moe", "mixture-of-experts", "mixtral"]):
+            return "moe"
+
+        for pattern in MOE_NAME_REGEXES:
+            if pattern.search(lowered):
+                return "moe"
+
+        return None
 
     @staticmethod
     def _normalize_percentage_value(value: Union[int, float]) -> float:
@@ -671,6 +1070,7 @@ class LLMBenchmarkPipeline:
         # 1. Fetch from Artificial Analysis
         logger.info("Fetching from Artificial Analysis...")
         aa_data = await self.aa_client.get_model_info(validated_model.name, session=session)
+        source_flags = {'aa': False, 'hf': False, 'ugi': False, 'open_vlm': False}
 
         if aa_data:
             # Fill benchmarks
@@ -694,6 +1094,7 @@ class LLMBenchmarkPipeline:
             result['model_specs'].update(normalized_specs)
 
             logger.info(f"  ✓ Retrieved {len(benchmarks)} benchmarks from AA")
+            source_flags['aa'] = True
         else:
             logger.warning("  ✗ No data from Artificial Analysis")
 
@@ -715,10 +1116,47 @@ class LLMBenchmarkPipeline:
                         result['model_specs']['architecture'] = self._normalize_architecture(value)
 
                 logger.info("  ✓ Retrieved data from Hugging Face")
+                source_flags['hf'] = True
             else:
                 logger.warning("  ✗ No data from Hugging Face")
 
-        # 3. Calculate coverage (only count fields that were originally None and got filled)
+        # 3. Fetch UGI leaderboard score
+        try:
+            ugi_score = await self.ugi_client.get_score(validated_model.name, session=session)
+            if ugi_score is not None:
+                if result['entity_benchmarks'].get('UGI Leaderboard') is None:
+                    result['entity_benchmarks']['UGI Leaderboard'] = ugi_score
+                    logger.info("  ✓ Populated UGI Leaderboard score: %s", ugi_score)
+                source_flags['ugi'] = True
+            else:
+                logger.info("  ✗ No UGI leaderboard score for %s", validated_model.name)
+        except Exception as exc:
+            logger.warning("Failed to fetch UGI leaderboard score: %s", exc)
+
+        # 4. Fetch Open VLM leaderboard score
+        try:
+            open_vlm_score = await self.open_vlm_client.get_score(validated_model.name, session=session)
+            if open_vlm_score is not None and result['entity_benchmarks'].get('Open VLM') is None:
+                result['entity_benchmarks']['Open VLM'] = open_vlm_score
+                source_flags['open_vlm'] = True
+                logger.info("  ✓ Populated Open VLM score: %s", open_vlm_score)
+            elif open_vlm_score is None:
+                logger.info("  ✗ No Open VLM score for %s", validated_model.name)
+            else:
+                source_flags['open_vlm'] = True
+
+            extra_open_vlm = await self.open_vlm_client.get_benchmark_scores(validated_model.name, session=session)
+            if extra_open_vlm:
+                for bench_name, score in extra_open_vlm.items():
+                    current_value = result['dev_benchmarks'].get(bench_name)
+                    if current_value is None:
+                        result['dev_benchmarks'][bench_name] = score
+                        logger.info("  ✓ Open VLM provided %s score: %s", bench_name, score)
+                source_flags['open_vlm'] = True
+        except Exception as exc:
+            logger.warning("Failed to fetch Open VLM score: %s", exc)
+
+        # 5. Calculate coverage (only count fields that were originally None and got filled)
         def count_filled_fields(original: Dict, current: Dict) -> int:
             """Count fields that were originally None/empty and now have values"""
             filled = 0
@@ -746,8 +1184,18 @@ class LLMBenchmarkPipeline:
         coverage = (total_filled_fields / total_fillable_fields * 100) if total_fillable_fields > 0 else 100.0
         logger.info(f"  Coverage: {coverage:.1f}% ({total_filled_fields}/{total_fillable_fields} fillable fields)")
 
-        if not result['model_specs'].get('architecture'):
+        inferred_arch = self._infer_architecture_from_name(
+            validated_model.name,
+            include_patterns=self.moe_include_patterns,
+            exclude_patterns=self.moe_exclude_patterns,
+        )
+        current_arch = result['model_specs'].get('architecture')
+        if inferred_arch == 'moe' and current_arch != 'moe':
+            result['model_specs']['architecture'] = 'moe'
+        elif not current_arch:
             result['model_specs']['architecture'] = self._normalize_architecture(None)
+
+        self.source_usage[normalize_name(validated_model.name)] = source_flags
 
         return result
 
@@ -956,7 +1404,8 @@ class LLMBenchmarkPipeline:
             result_entry = {
                 'model': validated_model.name,
                 'status': 'success',
-                'output': str(output_path)
+                'output': str(output_path),
+                'sources': self.source_usage.get(norm_name, {})
             }
             if origin:
                 result_entry['source_local_name'] = origin['source_local_name']
@@ -975,7 +1424,8 @@ class LLMBenchmarkPipeline:
             result_entry = {
                 'model': model_label,
                 'status': 'validation_error',
-                'error': error_msg
+                'error': error_msg,
+                'sources': self.source_usage.get(norm_name, {})
             }
             if origin:
                 result_entry['source_local_name'] = origin['source_local_name']
@@ -992,7 +1442,8 @@ class LLMBenchmarkPipeline:
             result_entry = {
                 'model': model_label,
                 'status': 'error',
-                'error': error_msg
+                'error': error_msg,
+                'sources': self.source_usage.get(norm_name, {})
             }
             if origin:
                 result_entry['source_local_name'] = origin['source_local_name']
@@ -1036,6 +1487,19 @@ class LLMBenchmarkPipeline:
                      pass
 
         successful_models = sum(1 for r in results if r['status'] == 'success')
+        source_summary = {key: 0 for key in ('aa', 'hf', 'ugi', 'open_vlm')}
+        for result in results:
+            if result['status'] != 'success':
+                continue
+            sources = result.get('sources', {}) or {}
+            for key in source_summary:
+                if sources.get(key):
+                    source_summary[key] += 1
+        self.last_run_source_stats = {
+            'total_success': successful_models,
+            'total_models': len(models_to_process),
+            'source_counts': source_summary,
+        }
 
         # Save batch summary
         summary_path = Path(self.config.output_dir) / "batch_summary.json"
@@ -1043,6 +1507,13 @@ class LLMBenchmarkPipeline:
             json.dump(results, f, indent=2)
 
         logger.info(f"\nBatch processing complete. {successful_models}/{len(models_to_process)} models successful.")
+        logger.info(
+            "Data sources used -> AA: %d, HF: %d, UGI: %d, OpenVLM: %d",
+            source_summary['aa'],
+            source_summary['hf'],
+            source_summary['ugi'],
+            source_summary['open_vlm'],
+        )
         logger.info(f"Summary saved to {summary_path}")
 
         self._write_ambiguous_summary(results)
@@ -1357,9 +1828,6 @@ async def launch_interactive_async():
                     'output': str(output_path)
                 })
                 successful += 1
-
-                if verbose:
-                    print(f"   ✅ Saved to: {output_path}")
 
                 ambiguous_results = await pipeline.generate_ambiguous_outputs(
                     local_model_name=model_name,
