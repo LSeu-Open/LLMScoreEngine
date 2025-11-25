@@ -19,9 +19,11 @@ LLM Benchmark Data Pipeline
 Automated pipeline to fill model benchmark JSONs using multiple API sources.
 
 Supports:
-- Artificial Analysis API (benchmark scores, pricing, specs)
-- Hugging Face API (model cards, parameters, leaderboard data)
-- Batch processing of multiple model JSONs
+- Artificial Analysis API for benchmark scores, pricing intel, and hardware specs
+- Hugging Face APIs for model cards, parameter metadata, and leaderboard snapshots
+- Open VLM Leaderboard (via Hugging Face) for VLM-specific benchmark pulls
+- Mixture-of-Experts override rules to normalize custom model names
+- Batch processing that fills multiple model JSON templates in a single run
 
 Requirements:
     pip install requests pandas tqdm python-dotenv pydantic pyyaml tenacity aiohttp
