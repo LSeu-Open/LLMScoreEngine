@@ -45,6 +45,8 @@ import argparse
 import re
 import copy
 import asyncio
+import sys
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Union, Sequence, Tuple, Pattern
 from pathlib import Path
 import aiohttp
@@ -53,6 +55,14 @@ from dataclasses import dataclass, asdict
 import logging
 from pydantic import BaseModel, ValidationError, field_validator, Field
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+try:  # pragma: no cover - fallback for direct script execution
+    from model_scoring.scoring.hf_score_math import HFScoreTelemetry, compute_score
+except ModuleNotFoundError:  # pragma: no cover - allows running script from tools folder
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from model_scoring.scoring.hf_score_math import HFScoreTelemetry, compute_score
 
 
 
@@ -154,6 +164,7 @@ class PipelineConfig(BaseModel):
     timeout: int = Field(30, gt=0, description="Request timeout in seconds")
     cache_ttl: int = Field(3600, ge=0, description="Cache TTL in seconds for API responses")
     continue_on_error: bool = Field(True, description="Continue processing other models if one fails")
+    skip_hf_score: bool = Field(False, description="Skip fetching Hugging Face telemetry during fill phase")
 
     @field_validator('template_path', 'output_dir')
     @classmethod
@@ -843,6 +854,56 @@ class HuggingFaceClient(APIClient):
         """Fetch model card information"""
         return await self.get(f"models/{model_id}", session=session)
 
+    @staticmethod
+    def _parse_created_at(raw_value: Any) -> Optional[datetime]:
+        if not raw_value or not isinstance(raw_value, str):
+            return None
+        value = raw_value.strip()
+        if not value:
+            return None
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+
+    async def get_model_telemetry(
+        self,
+        model_id: str,
+        session: Optional[aiohttp.ClientSession] = None,
+        model_payload: Optional[Dict[str, Any]] = None,
+    ) -> Optional[HFScoreTelemetry]:
+        """Fetch minimal telemetry for computing HF community score."""
+
+        payload = model_payload
+        if payload is None:
+            payload = await self.get_model_card(model_id, session=session)
+        if not payload:
+            return None
+
+        created_raw = payload.get("createdAt") or payload.get("cardData", {}).get("created_at")
+        created_at = self._parse_created_at(created_raw) or datetime.now(timezone.utc)
+
+        downloads = payload.get("downloads") or payload.get("downloadsAllTime") or 0
+        likes = payload.get("likes") or 0
+
+        try:
+            downloads_int = int(downloads)
+        except (TypeError, ValueError):
+            downloads_int = 0
+
+        try:
+            likes_int = int(likes)
+        except (TypeError, ValueError):
+            likes_int = 0
+
+        return HFScoreTelemetry(
+            downloads=max(downloads_int, 0),
+            likes=max(likes_int, 0),
+            created_at=created_at,
+        )
+
     def extract_info(self, model_card: Dict) -> Dict[str, Any]:
         """Extract relevant info from model card"""
         info = {}
@@ -1068,6 +1129,9 @@ class LLMBenchmarkPipeline:
 
         template_original = copy.deepcopy(template)
         result = copy.deepcopy(template)
+        result['community_score'] = result.get('community_score') or {}
+        community_score_section = result['community_score']
+        hf_card_payload: Optional[Dict[str, Any]] = None
 
         # 1. Fetch from Artificial Analysis
         logger.info("Fetching from Artificial Analysis...")
@@ -1106,6 +1170,7 @@ class LLMBenchmarkPipeline:
             hf_data = await self.hf_client.get_model_card(validated_model.hf_id, session=session)
 
             if hf_data:
+                hf_card_payload = hf_data
                 hf_info = self.hf_client.extract_info(hf_data)
 
                 # Fill in missing data
@@ -1121,6 +1186,40 @@ class LLMBenchmarkPipeline:
                 source_flags['hf'] = True
             else:
                 logger.warning("  ✗ No data from Hugging Face")
+
+        if validated_model.hf_id and not self.config.skip_hf_score and community_score_section.get('hf_score') is None:
+            try:
+                telemetry = await self.hf_client.get_model_telemetry(
+                    validated_model.hf_id,
+                    session=session,
+                    model_payload=hf_card_payload,
+                )
+            except Exception as exc:  # pragma: no cover - defensive logging
+                telemetry = None
+                logger.warning("Failed to fetch HF telemetry for %s: %s", validated_model.name, exc)
+
+            if telemetry:
+                score_result = compute_score(telemetry)
+                community_score_section['hf_score'] = score_result.hf_score
+                community_score_section['hf_score_details'] = {
+                    "downloads": telemetry.downloads,
+                    "likes": telemetry.likes,
+                    "age_months": score_result.age_months,
+                    "age_weeks": score_result.age_weeks,
+                    "download_score": score_result.download_score,
+                    "likes_score": score_result.likes_score,
+                    "age_score": score_result.age_score,
+                }
+                source_flags['hf'] = True
+                logger.info("  ✓ Computed Hugging Face community score: %.2f", score_result.hf_score)
+            else:
+                logger.info("  ✗ No Hugging Face telemetry for %s", validated_model.name)
+        elif not validated_model.hf_id:
+            logger.info("Skipping HF score: no hf_id for %s", validated_model.name)
+        elif self.config.skip_hf_score:
+            logger.info("Skipping HF score for %s (flag enabled)", validated_model.name)
+        else:
+            logger.info("Skipping HF score: existing value present for %s", validated_model.name)
 
         # 3. Fetch UGI leaderboard score
         try:
@@ -1595,6 +1694,8 @@ Examples:
                        help='Continue processing other models if one fails (default: True)')
     parser.add_argument('--no-continue-on-error', action='store_true',
                        help='Stop processing on first error')
+    parser.add_argument('--skip-hf-score', action='store_true',
+                       help='Skip Hugging Face telemetry fetch and community score computation')
 
     # API keys (can use environment variables)
     parser.add_argument('--aa-key',
@@ -2101,6 +2202,8 @@ async def _run_pipeline_cli_async(args: argparse.Namespace, parser: argparse.Arg
             config_data['timeout'] = args.timeout
         if args.no_continue_on_error:
             config_data['continue_on_error'] = False
+        if args.skip_hf_score:
+            config_data['skip_hf_score'] = True
 
         if args.aa_key:
             config_data['artificial_analysis_key'] = args.aa_key

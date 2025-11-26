@@ -24,6 +24,8 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta, timezone
 
 from model_scoring.scoring import hf_score
+from model_scoring.scoring import hf_score_math
+
 from config.scoring_config import HUGGING_FACE_SCORE_PARAMS
 
 # Forcing a re-evaluation due to a potential caching issue.
@@ -150,6 +152,25 @@ def test_compute_hf_score():
     actual_total = hf_score.compute_hf_score(model_data)
     
     assert actual_total == expected_total
+
+def test_compute_score_math():
+    """Ensure math helper produces deterministic telemetry results."""
+    telemetry = hf_score_math.HFScoreTelemetry(
+        downloads=MOCK_MODEL_INFO['downloads'],
+        likes=MOCK_MODEL_INFO['likes'],
+        created_at=MOCK_MODEL_INFO['created_at'],
+    )
+
+    result = hf_score_math.compute_score(telemetry, now=MOCK_MODEL_INFO['created_at'] + timedelta(days=180))
+
+    assert result.hf_score == hf_score.compute_hf_score({
+        "downloads in last 30 days": telemetry.downloads,
+        "total likes": telemetry.likes,
+        "age in months": result.age_months,
+    })
+    assert result.download_score == round(result.download_score, 4)
+    assert result.likes_score == round(result.likes_score, 4)
+    assert result.age_score == round(result.age_score, 4)
 
 def test_extract_model_info(mock_hf_api):
     """Tests the full data extraction and scoring process, mocking the API call."""

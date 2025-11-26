@@ -29,7 +29,7 @@
     - [Where to find the data ?](#where-to-find-the-data-)
 - [Usage](#usage)
   - [Command-Line Usage (Recommended)](#command-line-usage-recommended)
-    - [Fill Benchmark Pipeline (New)](#fill-benchmark-pipeline-new)
+    - [🚀 Fill Benchmark Pipeline (New)](#-fill-benchmark-pipeline-new)
     - [Visualize All Your Models Scores in One Powerful Report](#visualize-all-your-models-scores-in-one-powerful-report)
     - [Command-Line Options](#command-line-options)
   - [Programmatic Usage](#programmatic-usage)
@@ -281,6 +281,8 @@ All other fields are optional and can remain null if data is not available.
 
 #### Where to find the data ?
 
+The recommended workflow is to run the **Fill Benchmark Pipeline** (`tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py launch`). It queries the APIs listed below, hydrates `entity_benchmarks`, `dev_benchmarks`, `community_score`, and `model_specs`, and flags any remaining gaps for manual follow-up. Use the manual sources underneath only when the pipeline cannot retrieve a particular metric or when you are working completely offline.
+
 - `entity_benchmarks` :
 
 * [Artificial Analysis](https://artificialanalysis.ai/)
@@ -294,29 +296,19 @@ All other fields are optional and can remain null if data is not available.
 * [Dubesord_LLM](https://dubesor.de/benchtable)
 * [Open VLM](https://huggingface.co/spaces/opencompass/open_vlm_leaderboard)
 
-- `dev_benchmarks` : You usually find the data on the model's page on the provider's website or on the model's page on the [Hugging Face](https://huggingface.co/) website.
+- `dev_benchmarks` : The pipeline pulls from provider metadata and Hugging Face, but you can also read the model's provider or [Hugging Face](https://huggingface.co/) page directly for any scores still missing.
 
-- `community_score` : You will find Elo on the [LM-SYS Arena Leaderboard](https://beta.lmarena.ai/leaderboard) and use the 'hf_score.py' script to get huggingface score.
+- `community_score` : LMSYS ELO is sourced from the [LM-SYS Arena Leaderboard](https://beta.lmarena.ai/leaderboard). The Fill Benchmark Pipeline automatically fetches the Hugging Face community score plus telemetry whenever `hf_id` is provided, so manual runs of `hf_score.py` are only necessary for offline workflows or custom experiments.
 
-You can find the 'hf_score.py' script in the **model_scoring/scoring** folder.
-
-**Note**: To use the 'hf_score.py' script, you will need to install the 'huggingface_hub' library if it's not already installed when you create the virtual environment.
+If you need to call the script manually, it lives in **model_scoring/scoring** and requires the `huggingface_hub` dependency:
 
 ```bash
 pip install huggingface_hub
-```
 
-then you can use the script to get the huggingface score.
-
-Make sure to use the correct model name as it is written on the [Model's page on the Hugging Face](https://huggingface.co/) website. 
-
-For example, the model name for the 'DeepSeek-R1' model is 'deepseek-ai/DeepSeek-R1'.
-
-```bash
 python model_scoring/scoring/hf_score.py deepseek-ai/DeepSeek-R1
 ```
 
-- `model_specs` : You will find the price on the model's page on the provider's website or on the model's page on the [Hugging Face](https://huggingface.co/) website. Some of this data can also be found on the [Artificial Analysis](https://artificialanalysis.ai/) website.
+- `model_specs` : The pipeline will attempt to infer pricing, context, parameters, and architecture via provider APIs; otherwise, collect the details from the model provider or [Hugging Face](https://huggingface.co/) pages (Artificial Analysis is another good source).
 
 ## Usage
 
@@ -414,7 +406,8 @@ You can customize the scoring process with the following optional flags:
 | `--quiet`            | Suppress all informational output and only print the final scores in the console. Useful for scripting. | `python score_models.py --all --quiet`              |
 | `--config <path>`    | Path to a custom Python configuration file to override the default scoring parameters.                  | `python score_models.py ModelName --config my_config.py` |
 | `--csv`              | Generate a CSV report from existing results.                                                            | `python score_models.py --csv`                      |
-| `--graph`            | Generate a graph report from existing csv report.                                                          | `python score_models.py --graph`                    |
+| `--graph`            | Generate a graph report from existing csv report.                                                       | `python score_models.py --graph`                    |
+| `--skip-hf-score`    | (Fill pipeline) Skip Hugging Face telemetry calls if you need to conserve quota or run offline.         | `python tools/fill-benchmark-pipeline/llm_benchmark_pipeline.py --skip-hf-score ...` |
 
 ### Programmatic Usage
 
